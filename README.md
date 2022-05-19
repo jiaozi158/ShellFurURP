@@ -17,14 +17,18 @@ Screenshots (High Fidelity Scene)
  
  ![HighFidelity2](https://user-images.githubusercontent.com/62869447/169247998-f8e8bd37-da1c-4a7c-8e37-d8714707e940.jpg)
 
+all with SSAA X16 enabled. (current URP does not have effective AA method.)
+
 Documentation
 ------------
 Documentation is not ready yet.
+You may try the demo first.
 
 Requirements
 ------------
 - URP 12 and above(recommended)
 - Geometry Shader Supported GPU.
+
 Can run on URP 10 but not suggested.
 
 License
