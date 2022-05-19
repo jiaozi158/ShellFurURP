@@ -21,6 +21,12 @@ Documentation
 ------------
 Documentation is not ready yet.
 
+Requirements
+------------
+- URP 12 and above(recommended)
+- Geometry Shader Supported GPU.
+Can run on URP 10 but not suggested.
+
 License
 ------------
 ![MIT License](http://img.shields.io/badge/license-MIT-blue.svg?style=flat)
