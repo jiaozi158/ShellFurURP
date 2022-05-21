@@ -17,9 +17,9 @@ Screenshots (High Fidelity Scene)
  
  ![HighFidelity2](https://user-images.githubusercontent.com/62869447/169247998-f8e8bd37-da1c-4a7c-8e37-d8714707e940.jpg)
 
- Thinner Fur:
-
-
+Thinner Fur:
+ 
+ ![HighFidelity3](https://user-images.githubusercontent.com/62869447/169638305-15d2012a-665d-44cc-96a5-72032becd353.jpg)
 
 all with SSAA X16 enabled. (current URP does not have effective AA method.)
 
