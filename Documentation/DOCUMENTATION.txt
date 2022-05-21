@@ -1,0 +1,8 @@
+Documentation (unfinished)
+=============
+
+- Tips (IMPORTANT)
+
+- Parameters in Shader Inspector
+
+- Fur Appearance Customization
