@@ -11,15 +11,19 @@ ShellFurURP
  
  Please change the Project Quality from "HighFidelity" to "Performant" if opening "Performant" scene.
  
-Screenshots (High Fidelity Scene)
+Screenshots
 ------------
- ![HighFidelity](https://user-images.githubusercontent.com/62869447/169247172-6014ea36-db6c-4637-9156-96c080bfc997.jpg)
- 
- ![HighFidelity2](https://user-images.githubusercontent.com/62869447/169247998-f8e8bd37-da1c-4a7c-8e37-d8714707e940.jpg)
+**(High Fidelity Scene)**
 
-Thinner Fur:
+ ![HighFidelity1](https://github.com/jiaozi158/ShellFurURP/blob/main/Documentation/Images/Demo/HighFidelity/HighFidelity1_new.jpg)
  
- ![HighFidelity3](https://user-images.githubusercontent.com/62869447/169638305-15d2012a-665d-44cc-96a5-72032becd353.jpg)
+ ![HighFidelity2](https://github.com/jiaozi158/ShellFurURP/blob/main/Documentation/Images/Demo/HighFidelity/HighFidelity2_new.jpg)
+
+**(Performant Scene)**
+ 
+ ![Performant1](https://github.com/jiaozi158/ShellFurURP/blob/main/Documentation/Images/Demo/Performant/Performant1_new.jpg)
+ 
+ ![Performant2](https://github.com/jiaozi158/ShellFurURP/blob/main/Documentation/Images/Demo/Performant/Performant2_new.jpg)
 
 all with SSAA X16 enabled. (current URP does not have effective AA method.)
 
