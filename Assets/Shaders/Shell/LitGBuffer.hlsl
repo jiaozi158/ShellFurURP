@@ -1,15 +1,19 @@
-#ifndef FUR_SHELL_LIT_HLSL
-#define FUR_SHELL_LIT_HLSL
+#ifndef FUR_SHELL_LIT_DEFERRED_HLSL
+#define FUR_SHELL_LIT_DEFERRED_HLSL
 
 #include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
-#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SurfaceInput.hlsl"
+//#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SurfaceInput.hlsl"
 #include "./Param.hlsl"
 #include "./Common.hlsl"
-#if defined(_FUR_SPECULAR)
+#if defined(_FUR_SPECULAR) && defined(_FUR_SPECULAR_DEFERRED)
 #include "./FurSpecular.hlsl"
 #endif
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/UnityGBuffer.hlsl"
 // VR single pass instance compability:
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+#if defined(LOD_FADE_CROSSFADE)
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/LODCrossFade.hlsl"
+#endif
 
 struct Attributes
 {
@@ -174,10 +178,7 @@ void AppendShellVertexInstancing(inout TriangleStream<g2f> stream, v2g input, in
     output.layer = layer;
 
     float3 vertexLight = VertexLighting(vertexInput.positionWS, normalInput.normalWS);
-    float fogFactor = 0;
-#if !defined(_FOG_FRAGMENT)
-    fogFactor = ComputeFogFactor(vertexInput.positionCS.z);
-#endif
+    float fogFactor = ComputeFogFactor(vertexInput.positionCS.z);
     output.fogFactorAndVertexLight = float4(fogFactor, vertexLight);
 
     OUTPUT_LIGHTMAP_UV(input.lightmapUV, unity_LightmapST, output.lightmapUV);
@@ -188,21 +189,7 @@ void AppendShellVertexInstancing(inout TriangleStream<g2f> stream, v2g input, in
 }
 
 //-----------------------------------(below) For Microsoft Shader Model > 4.1-----------------------------------
-// "[instance(3)]" = 3+1 geometry shader instances, so we can have at most 13x4 = 52 shells
-//
-// If you need 200 shells (too much for game):
-// "200 / 13 = 15, remains 5"
-// 
-// You will need "16" instances, "15" for 195 shells, "1" for 5 remaining shells.
-// So, use [instance(15)] to execute "15+1" instances.
-// 
-// IMPORTANT: if you set [instance(30)] for 200 shells, you will waste performance because
-//            "stream.RestartStrip()" will run on 14 istances (with empty output).
-// 
-//            Please keep "n" in [instance(n)] the same for all "passes.hlsl" (Lit, Depth, DepthNormals, Shadow, LitGBuffer...)
-//            Or something will break! (post-processing in most cases)
-// 
-// LIMIT: You can only have up to 32 instances, so (32+1)x13 = 429 shells at most.
+// See "Lit.hlsl" for more information.
 #if defined(_GEOM_INSTANCING)
 [instance(3)]
 [maxvertexcount(39)]
@@ -241,7 +228,7 @@ void geom(triangle v2g input[3], inout TriangleStream<g2f> stream)
 #endif
 //-----------------------------------(above) For Microsoft Shader Model < 4.1-----------------------------------
 
-half4 frag(g2f input) : SV_Target
+FragmentOutput frag(g2f input)
 {
     float2 furUv = input.uv / _BaseMap_ST.xy * _FurScale;
     float4 furColor = SAMPLE_TEXTURE2D(_FurMap, sampler_FurMap, furUv);
@@ -250,21 +237,24 @@ half4 frag(g2f input) : SV_Target
 
     float3 viewDirWS = SafeNormalize(GetCameraPositionWS() - input.positionWS);
     float3 normalTS = UnpackNormalScale(
-        SAMPLE_TEXTURE2D(_NormalMap, sampler_NormalMap, furUv), 
+        SAMPLE_TEXTURE2D(_NormalMap, sampler_NormalMap, furUv),
         _NormalScale);
     // 1.0 should be tangentOS.w, not passing it to fragment shader to keep 39 max vertex counts.
     float3 bitangent = SafeNormalize(1.0 * cross(input.normalWS, input.tangentWS));
     float3 normalWS = SafeNormalize(TransformTangentToWorld(
-        normalTS, 
+        normalTS,
         float3x3(input.tangentWS, bitangent, input.normalWS)));
 
-    SurfaceData surfaceData = (SurfaceData)0;
+    SurfaceData surfaceData;
     InitializeStandardLitSurfaceData(input.uv, surfaceData);
-    half AO = (1.0-SAMPLE_TEXTURE2D(_AOMap, sampler_AOMap, input.uv / _BaseMap_ST.xy).x)* _Occlusion;
-    surfaceData.occlusion = (1.0 - AO) * lerp(1.0 - _Occlusion* _Occlusion, 1.0, input.layer);
-#if !defined(DEBUG_DISPLAY)
-    //surfaceData.albedo *= surfaceData.occlusion;
+
+// LOD cross fade is still in 2022 beta, test it in the future.
+#ifdef LOD_FADE_CROSSFADE
+    LODFadeCrossFade(input.positionCS);
 #endif
+
+    half AO = (1.0 - SAMPLE_TEXTURE2D(_AOMap, sampler_AOMap, input.uv / _BaseMap_ST.xy).x) * _Occlusion;
+    surfaceData.occlusion = (1.0 - AO) * lerp(1.0 - _Occlusion * _Occlusion, 1.0, input.layer);
 
     InputData inputData = (InputData)0;
     inputData.positionWS = input.positionWS;
@@ -278,7 +268,6 @@ half4 frag(g2f input) : SV_Target
     inputData.fogCoord = input.fogFactorAndVertexLight.x;
     inputData.vertexLighting = input.fogFactorAndVertexLight.yzw;
     inputData.bakedGI = SAMPLE_GI(input.lightmapUV, input.vertexSH, normalWS);
-    inputData.normalizedScreenSpaceUV = GetNormalizedScreenSpaceUV(input.positionCS);
 
     SETUP_DEBUG_TEXTURE_DATA(inputData, input.uv, _BaseMap);
 
@@ -286,9 +275,10 @@ half4 frag(g2f input) : SV_Target
     ApplyDecalToSurfaceData(input.positionCS, surfaceData, inputData);
 #endif
 
-    half4 color = UniversalFragmentPBR(inputData, surfaceData);
-
-#if defined(_FUR_SPECULAR) && !defined(DEBUG_DISPLAY)
+    half3 rimColor = half3(0.0, 0.0, 0.0);
+    half3 color = half3(0.0, 0.0, 0.0);
+    
+#if defined(_FUR_SPECULAR) && defined(_FUR_SPECULAR_DEFERRED)
     // Use abs(f) to avoid warning messages that f should not be negative in pow(f, e).
     SurfaceOutputFur s = (SurfaceOutputFur)0;
     s.Albedo = abs(surfaceData.albedo * _BaseColor.rgb);
@@ -304,20 +294,27 @@ half4 frag(g2f input) : SV_Target
     s.Layer = input.layer;
     s.Kappa = (1.0 - _Kappa / 2.0);
 
-    Light mainLight = GetMainLight();
-    uint meshRenderingLayers = GetMeshRenderingLightLayer();
+    // Get the main light.
+    Light dirLight = GetMainLight();
+
 #ifdef _LIGHT_LAYERS
-    if (IsMatchingLightLayer(mainLight.layerMask, meshRenderingLayers))
+    uint meshRenderingLayers = GetMeshRenderingLightLayer();
+    if (IsMatchingLightLayer(dirLight.layerMask, meshRenderingLayers))
 #endif
     {
-        half3 mainLightColor = mainLight.color.rgb * mainLight.distanceAttenuation;
+        half3 mainLightColor = dirLight.color.rgb * dirLight.distanceAttenuation;
         // "Screen" blend mode.
         mainLightColor = (1 - (1 - s.Albedo) * (1 - mainLightColor));
-        color.rgb += (mainLightColor * FurBSDFYan(s, mainLight.direction, viewDirWS, normalWS, 1.0, _Backlit, _Area));
 
+        // Calculate Rim Light
+        ApplyRimLightDeferred(rimColor, input.positionWS, viewDirWS, normalWS);
+
+        color += (mainLightColor * FurBSDFYan(s, dirLight.direction, viewDirWS, normalWS, 1.0, _Backlit, _Area))+rimColor;
     }
 
-    // Calculate additional lights.
+    // Additional Lights in deferred can be very slow. (not suggested)
+    // Max Light count is still 8 per object.
+    // A better solution is to customize URP's deferred rendering.
 #ifdef _ADDITIONAL_LIGHTS
     int additionalLightsCount = GetAdditionalLightsCount();
     for (int i = 0; i < additionalLightsCount; ++i)
@@ -331,21 +328,23 @@ half4 frag(g2f input) : SV_Target
             half3 lightColor = light.color.rgb * light.distanceAttenuation;
             // "Screen" blend mode.
             lightColor = (1 - (1 - s.Albedo) * (1 - lightColor));
-            color.rgb += (lightColor * FurBSDFYan(s, light.direction, viewDirWS, normalWS, 1.0, _Backlit, _Area));
+            color += (lightColor * FurBSDFYan(s, light.direction, viewDirWS, normalWS, 1.0, _Backlit, _Area));
         }
     }
 #endif
-
-    color.rgb = -min(-color.rgb, half3(0.0, 0.0, 0.0));
 #endif
 
-#if !defined(DEBUG_DISPLAY)
-    ApplyRimLight(color.rgb, input.positionWS, viewDirWS, normalWS);
-#endif
+    BRDFData brdfData;
+    InitializeBRDFData(surfaceData.albedo, surfaceData.metallic, surfaceData.specular, surfaceData.smoothness, surfaceData.alpha, brdfData);
 
-    color.rgb = MixFog(color.rgb, inputData.fogCoord);
+    Light mainLight = GetMainLight(inputData.shadowCoord, inputData.positionWS, inputData.shadowMask);
+    MixRealtimeAndBakedGI(mainLight, inputData.normalWS, inputData.bakedGI, inputData.shadowMask);
 
-    return color;
+    // Store GI, Emission, Rim Light, and Fur Specular in the GBuffer3.
+
+    color += GlobalIllumination(brdfData, inputData.bakedGI, surfaceData.occlusion, inputData.positionWS, inputData.normalWS, inputData.viewDirectionWS);
+    FragmentOutput output = BRDFDataToGbuffer(brdfData, inputData, surfaceData.smoothness, surfaceData.emission + color, surfaceData.occlusion);
+
+    return output;
 }
-
 #endif

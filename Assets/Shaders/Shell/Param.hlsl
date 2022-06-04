@@ -9,7 +9,8 @@ float _FurScale;
 float4 _BaseMove;
 float4 _WindFreq;
 float4 _WindMove;
-float _FaceViewProdThresh;
+
+float _BentType;
 
 TEXTURE2D(_FurMap); 
 SAMPLER(sampler_FurMap);
@@ -40,5 +41,4 @@ float _MedulaScatter;
 float _MedulaAbsorb;
 float _Kappa;
 
-float _BentType;
 #endif

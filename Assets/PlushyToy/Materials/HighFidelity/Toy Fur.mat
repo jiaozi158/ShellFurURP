@@ -22,7 +22,7 @@ Material:
   m_PrefabAsset: {fileID: 0}
   m_Name: Toy Fur
   m_Shader: {fileID: 4800000, guid: 589ea0397284e0e42b1985a0455d66b2, type: 3}
-  m_ShaderKeywords: _FUR_SPECULAR _GEOM_INSTANCING _SPECULARHIGHLIGHTS_OFF
+  m_ShaderKeywords: _FUR_SPECULAR _FUR_SPECULAR_DEFERRED _GEOM_INSTANCING _SPECULARHIGHLIGHTS_OFF
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
@@ -132,9 +132,10 @@ Material:
     - _DstBlendAlpha: 0
     - _EnvironmentReflections: 1
     - _FurLengthIntensity: 0.66
-    - _FurScale: 1.8
+    - _FurScale: 2.1
     - _FurSmoothness: 0.4
     - _FurSpecular: 1
+    - _FurSpecularDeferredAdditional: 1
     - _GeomInstancing: 1
     - _GlossMapScale: 0
     - _Glossiness: 0
@@ -145,7 +146,7 @@ Material:
     - _MedulaScatter: 0.5
     - _Metallic: 0
     - _NoFurShadow: 0
-    - _NormalScale: 0.66
+    - _NormalScale: 0.4
     - _Occlusion: 0.4
     - _OcclusionStrength: 1
     - _Parallax: 0.005
@@ -154,7 +155,7 @@ Material:
     - _RimLightIntensity: 0
     - _RimLightPower: 12
     - _ShadowExtraBias: -0.01
-    - _ShellAmount: 39
+    - _ShellAmount: 52
     - _ShellStep: 0.001
     - _Smoothness: 0
     - _SmoothnessTextureChannel: 0

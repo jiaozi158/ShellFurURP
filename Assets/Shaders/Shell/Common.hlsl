@@ -85,6 +85,51 @@ void ApplyRimLight(inout float3 color, float3 posWS, float3 viewDirWS, float3 no
 #endif
 }
 
+void ApplyRimLightDeferred(inout float3 color, float3 posWS, float3 viewDirWS, float3 normalWS)
+{
+    float viewDotNormal = abs(dot(viewDirWS, normalWS));
+    float normalFactor = pow(abs(1.0 - viewDotNormal), _RimLightPower);
+
+    Light light = GetMainLight();
+#ifdef _LIGHT_LAYERS
+    uint meshRenderingLayer = GetMeshRenderingLightLayer();
+    if (IsMatchingLightLayer(light.layerMask, meshRenderingLayer))
+#endif
+    {
+        float lightDirDotView = dot(light.direction, viewDirWS);
+        float intensity = pow(max(-lightDirDotView, 0.0), _RimLightPower);
+        intensity *= _RimLightIntensity * normalFactor;
+#ifdef _MAIN_LIGHT_SHADOWS
+        float4 shadowCoord = TransformWorldToShadowCoord(posWS);
+        intensity *= MainLightRealtimeShadow(shadowCoord);
+#endif 
+        color += intensity * light.color;
+    }
+
+#ifdef _ADDITIONAL_LIGHTS
+    int additionalLightsCount = GetAdditionalLightsCount();
+    for (int i = 0; i < additionalLightsCount; ++i)
+    {
+        int index = GetPerObjectLightIndex(i);
+        Light light = GetAdditionalPerObjectLight(index, posWS);
+#ifdef _LIGHT_LAYERS
+        uint meshRenderingLayer = GetMeshRenderingLightLayer();
+        if (IsMatchingLightLayer(light.layerMask, meshRenderingLayer))
+#endif
+        {
+            float lightDirDotView = dot(light.direction, viewDirWS);
+            float intensity = max(-lightDirDotView, 0.0);
+            intensity *= _RimLightIntensity * normalFactor;
+            intensity *= light.distanceAttenuation;
+#ifdef _MAIN_LIGHT_SHADOWS
+            intensity *= AdditionalLightRealtimeShadow(index, posWS);
+#endif 
+            color += intensity * light.color;
+        }
+    }
+#endif
+}
+
 inline float rand(float2 seed)
 {
     return frac(sin(dot(seed.xy, float2(12.9898, 78.233))) * 43758.5453);
