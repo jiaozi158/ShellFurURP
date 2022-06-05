@@ -12,12 +12,12 @@ struct SurfaceOutputFur
 	half3 Albedo;
 	half MedulaScatter;
 	half MedulaAbsorb;
-	half3 Normal;//Tangent actually
-	half3 VNormal;//vertext normal
-	half3 Emission;
-	half Alpha;
+	//half3 Normal; //Tangent actually
+	//half3 VNormal; //vertext normal
+	//half3 Emission;
+	//half Alpha;
 	half Roughness;
-	half Specular;
+	//half Specular;
 	half Layer;
 	half Kappa;
 };

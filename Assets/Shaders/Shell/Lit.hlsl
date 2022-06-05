@@ -17,7 +17,8 @@ struct Attributes
     float3 normalOS : NORMAL;
     float4 tangentOS : TANGENT;
     float2 texcoord : TEXCOORD0;
-    float2 lightmapUV : TEXCOORD1;
+    float2 staticLightmapUV : TEXCOORD1;
+    float2 dynamicLightmapUV : TEXCOORD2; // Dynamic lightmap UVs
     UNITY_VERTEX_INPUT_INSTANCE_ID
 };
 
@@ -27,7 +28,10 @@ struct v2g
     float3 normalOS : NORMAL;
     float4 tangentOS : TANGENT;
     float2 texcoord : TEXCOORD0;
-    float2 lightmapUV : TEXCOORD1;
+    float2 staticLightmapUV : TEXCOORD1;
+#ifdef DYNAMICLIGHTMAP_ON
+    float2  dynamicLightmapUV : TEXCOORD2;
+#endif
     UNITY_VERTEX_INPUT_INSTANCE_ID
 };
 
@@ -38,9 +42,12 @@ struct g2f
     float3 normalWS : TEXCOORD1;
     float3 tangentWS : TEXCOORD2;
     float2 uv : TEXCOORD4;
-    DECLARE_LIGHTMAP_OR_SH(lightmapUV, vertexSH, 5);
-    float4 fogFactorAndVertexLight : TEXCOORD6; // x: fogFactor, yzw: vertex light
+    DECLARE_LIGHTMAP_OR_SH(staticLightmapUV, vertexSH, 5);
+    float fogFactor : TEXCOORD6;
     float  layer : TEXCOORD7;
+#ifdef DYNAMICLIGHTMAP_ON
+    float2  dynamicLightmapUV : TEXCOORD8;
+#endif
     UNITY_VERTEX_INPUT_INSTANCE_ID
     UNITY_VERTEX_OUTPUT_STEREO
 };
@@ -59,8 +66,11 @@ v2g vert(Attributes input)
     output.positionOS = input.positionOS;
     output.normalOS = input.normalOS;
     output.tangentOS = input.tangentOS;
-    output.lightmapUV = input.lightmapUV;
     output.texcoord = input.texcoord;
+    output.staticLightmapUV = input.staticLightmapUV;
+#ifdef DYNAMICLIGHTMAP_ON
+    output.dynamicLightmapUV = input.dynamicLightmapUV.xy * unity_DynamicLightmapST.xy + unity_DynamicLightmapST.zw;
+#endif
     return output;
 }
 
@@ -91,12 +101,10 @@ void AppendShellVertex(inout TriangleStream<g2f> stream, v2g input, int index)
     float layer = (float)index / clampedShellAmount;
 
     float3 groomTS = SafeNormalize(UnpackNormal(SAMPLE_TEXTURE2D_LOD(_FurDirMap, sampler_FurDirMap, input.texcoord / _BaseMap_ST.xy, 0).xyzw));
-
-    float3 bitangent = SafeNormalize(input.tangentOS.w * cross(normalInput.normalWS, normalInput.tangentWS));
     
     float3 groomWS = SafeNormalize(TransformTangentToWorld(
         groomTS,
-        float3x3(normalInput.tangentWS, bitangent, normalInput.normalWS)));
+        float3x3(normalInput.tangentWS, normalInput.bitangentWS, normalInput.normalWS)));
 
     float bent = _BentType * layer + (1 - _BentType);
 
@@ -113,11 +121,15 @@ void AppendShellVertex(inout TriangleStream<g2f> stream, v2g input, int index)
     output.tangentWS = normalInput.tangentWS;
     output.layer = layer;
 
-    float3 vertexLight = VertexLighting(vertexInput.positionWS, normalInput.normalWS);
-    float fogFactor = ComputeFogFactor(vertexInput.positionCS.z);
-    output.fogFactorAndVertexLight = float4(fogFactor, vertexLight);
+    output.fogFactor = 0;
+#if !defined(_FOG_FRAGMENT)
+    output.fogFactor = ComputeFogFactor(vertexInput.positionCS.z);
+#endif
 
-    OUTPUT_LIGHTMAP_UV(input.lightmapUV, unity_LightmapST, output.lightmapUV);
+    OUTPUT_LIGHTMAP_UV(input.staticLightmapUV, unity_LightmapST, output.staticLightmapUV);
+#ifdef DYNAMICLIGHTMAP_ON
+    output.dynamicLightmapUV = input.dynamicLightmapUV;
+#endif
     OUTPUT_SH(output.normalWS.xyz, output.vertexSH);
 
 
@@ -152,11 +164,9 @@ void AppendShellVertexInstancing(inout TriangleStream<g2f> stream, v2g input, in
 
     float3 groomTS = SafeNormalize(UnpackNormal(SAMPLE_TEXTURE2D_LOD(_FurDirMap, sampler_FurDirMap, input.texcoord / _BaseMap_ST.xy, 0).xyzw));
 
-    float3 bitangent = SafeNormalize(input.tangentOS.w * cross(normalInput.normalWS, normalInput.tangentWS));
-
     float3 groomWS = SafeNormalize(TransformTangentToWorld(
         groomTS,
-        float3x3(normalInput.tangentWS, bitangent, normalInput.normalWS)));
+        float3x3(normalInput.tangentWS, normalInput.bitangentWS, normalInput.normalWS)));
 
     float bent = _BentType * layer + (1 - _BentType);
 
@@ -174,13 +184,16 @@ void AppendShellVertexInstancing(inout TriangleStream<g2f> stream, v2g input, in
     output.layer = layer;
 
     float3 vertexLight = VertexLighting(vertexInput.positionWS, normalInput.normalWS);
-    float fogFactor = 0;
-#if !defined(_FOG_FRAGMENT)
-    fogFactor = ComputeFogFactor(vertexInput.positionCS.z);
-#endif
-    output.fogFactorAndVertexLight = float4(fogFactor, vertexLight);
 
-    OUTPUT_LIGHTMAP_UV(input.lightmapUV, unity_LightmapST, output.lightmapUV);
+    output.fogFactor = 0;
+#if !defined(_FOG_FRAGMENT)
+    output.fogFactor = ComputeFogFactor(vertexInput.positionCS.z);
+#endif
+
+    OUTPUT_LIGHTMAP_UV(input.staticLightmapUV, unity_LightmapST, output.staticLightmapUV);
+#ifdef DYNAMICLIGHTMAP_ON
+    output.dynamicLightmapUV = input.dynamicLightmapUV;
+#endif
     OUTPUT_SH(output.normalWS.xyz, output.vertexSH);
 
 
@@ -262,9 +275,6 @@ half4 frag(g2f input) : SV_Target
     InitializeStandardLitSurfaceData(input.uv, surfaceData);
     half AO = (1.0-SAMPLE_TEXTURE2D(_AOMap, sampler_AOMap, input.uv / _BaseMap_ST.xy).x)* _Occlusion;
     surfaceData.occlusion = (1.0 - AO) * lerp(1.0 - _Occlusion* _Occlusion, 1.0, input.layer);
-#if !defined(DEBUG_DISPLAY)
-    //surfaceData.albedo *= surfaceData.occlusion;
-#endif
 
     InputData inputData = (InputData)0;
     inputData.positionWS = input.positionWS;
@@ -275,10 +285,23 @@ half4 frag(g2f input) : SV_Target
 #else
     inputData.shadowCoord = half4(0, 0, 0, 0);
 #endif
-    inputData.fogCoord = input.fogFactorAndVertexLight.x;
-    inputData.vertexLighting = input.fogFactorAndVertexLight.yzw;
-    inputData.bakedGI = SAMPLE_GI(input.lightmapUV, input.vertexSH, normalWS);
+    inputData.fogCoord = input.fogFactor;
+
+#ifdef _ADDITIONAL_LIGHTS_VERTEX
+    // Vertex Lighting will not be supported as it is not fast enough when calculating so many vertices (in geometry shader).
+
+    inputData.vertexLighting = half3(0, 0, 0);
+    //inputData.vertexLighting = input.fogFactorAndVertexLight.yzw;
+#endif
+
+#if defined(DYNAMICLIGHTMAP_ON)
+    inputData.bakedGI = SAMPLE_GI(input.staticLightmapUV, input.dynamicLightmapUV, input.vertexSH, inputData.normalWS);
+#else
+    inputData.bakedGI = SAMPLE_GI(input.staticLightmapUV, input.vertexSH, inputData.normalWS);
+#endif
+
     inputData.normalizedScreenSpaceUV = GetNormalizedScreenSpaceUV(input.positionCS);
+    inputData.shadowMask = SAMPLE_SHADOWMASK(input.staticLightmapUV);
 
     SETUP_DEBUG_TEXTURE_DATA(inputData, input.uv, _BaseMap);
 
@@ -294,13 +317,8 @@ half4 frag(g2f input) : SV_Target
     s.Albedo = abs(surfaceData.albedo * _BaseColor.rgb);
     s.MedulaScatter = abs(_MedulaScatter);
     s.MedulaAbsorb = abs(1.0 - _MedulaAbsorb);
-    s.Normal = input.tangentWS;
-    s.VNormal = normalWS;
-    s.Alpha = 1.0;
     // Convert smoothness to roughness, (1 - smoothness) is perceptual roughness.
     s.Roughness = (1.0 - _FurSmoothness) * (1.0 - _FurSmoothness);
-    s.Emission = half3(0.0, 0.0, 0.0);
-    s.Specular = 0.1;
     s.Layer = input.layer;
     s.Kappa = (1.0 - _Kappa / 2.0);
 

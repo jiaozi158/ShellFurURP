@@ -84,11 +84,9 @@ void AppendShellVertex(inout TriangleStream<g2f> stream, v2g input, int index)
 
     float3 groomTS = SafeNormalize(UnpackNormal(SAMPLE_TEXTURE2D_LOD(_FurDirMap, sampler_FurDirMap, input.uv / _BaseMap_ST.xy, 0).xyzw));
 
-    float3 bitangent = SafeNormalize(input.tangentOS.w * cross(normalInput.normalWS, normalInput.tangentWS));
-
     float3 groomWS = SafeNormalize(TransformTangentToWorld(
         groomTS,
-        float3x3(normalInput.tangentWS, bitangent, normalInput.normalWS)));
+        float3x3(normalInput.tangentWS, normalInput.bitangentWS, normalInput.normalWS)));
 
     float bent = _BentType * layer + (1 - _BentType);
 
@@ -140,11 +138,9 @@ void AppendShellVertexInstancing(inout TriangleStream<g2f> stream, v2g input, in
 
     float3 groomTS = SafeNormalize(UnpackNormal(SAMPLE_TEXTURE2D_LOD(_FurDirMap, sampler_FurDirMap, input.uv / _BaseMap_ST.xy, 0).xyzw));
 
-    float3 bitangent = SafeNormalize(input.tangentOS.w * cross(normalInput.normalWS, normalInput.tangentWS));
-
     float3 groomWS = SafeNormalize(TransformTangentToWorld(
         groomTS,
-        float3x3(normalInput.tangentWS, bitangent, normalInput.normalWS)));
+        float3x3(normalInput.tangentWS, normalInput.bitangentWS, normalInput.normalWS)));
 
     float bent = _BentType * layer + (1 - _BentType);
 

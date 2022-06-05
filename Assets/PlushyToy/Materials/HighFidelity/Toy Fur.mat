@@ -135,6 +135,7 @@ Material:
     - _FurScale: 2.1
     - _FurSmoothness: 0.4
     - _FurSpecular: 1
+    - _FurSpecularDeferred: 1
     - _FurSpecularDeferredAdditional: 1
     - _GeomInstancing: 1
     - _GlossMapScale: 0

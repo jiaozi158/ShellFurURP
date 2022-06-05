@@ -38,7 +38,7 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 474838046}
-  m_IndirectSpecularColor: {r: 0.6314545, g: 0.57359624, b: 0.5552618, a: 1}
+  m_IndirectSpecularColor: {r: 0.61043227, g: 0.5585511, b: 0.54337025, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -933,6 +933,16 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6840022208947826975, guid: 4974bcf6866001f41972891bdb9409e2,
         type: 3}
+      propertyPath: m_ScaleInLightmap
+      value: 10
+      objectReference: {fileID: 0}
+    - target: {fileID: 6840022208947826975, guid: 4974bcf6866001f41972891bdb9409e2,
+        type: 3}
+      propertyPath: m_LightmapParameters
+      value: 
+      objectReference: {fileID: 15200, guid: 0000000000000000f000000000000000, type: 0}
+    - target: {fileID: 6840022208947826975, guid: 4974bcf6866001f41972891bdb9409e2,
+        type: 3}
       propertyPath: m_Materials.Array.data[0]
       value: 
       objectReference: {fileID: 2100000, guid: 8153042031131c34bb3a01fc1ab9dd80, type: 2}
@@ -1149,6 +1159,31 @@ PrefabInstance:
   m_Modification:
     m_TransformParent: {fileID: 1086830509}
     m_Modifications:
+    - target: {fileID: 7094708726747108588, guid: f4a4bb51ffe2d0346a072a894edef76d,
+        type: 3}
+      propertyPath: m_ReceiveGI
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 7094708726747108588, guid: f4a4bb51ffe2d0346a072a894edef76d,
+        type: 3}
+      propertyPath: m_ImportantGI
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 7094708726747108588, guid: f4a4bb51ffe2d0346a072a894edef76d,
+        type: 3}
+      propertyPath: m_PreserveUVs
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 7094708726747108588, guid: f4a4bb51ffe2d0346a072a894edef76d,
+        type: 3}
+      propertyPath: m_ScaleInLightmap
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7094708726747108588, guid: f4a4bb51ffe2d0346a072a894edef76d,
+        type: 3}
+      propertyPath: m_LightmapParameters
+      value: 
+      objectReference: {fileID: 15200, guid: 0000000000000000f000000000000000, type: 0}
     - target: {fileID: 7094708726747108588, guid: f4a4bb51ffe2d0346a072a894edef76d,
         type: 3}
       propertyPath: m_Materials.Array.data[0]

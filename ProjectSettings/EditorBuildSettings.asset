@@ -11,4 +11,7 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/HighFidelity/HighFidelity.unity
     guid: 5ce8e856d4c4d294fb9b6e6bd70d6c59
+  - enabled: 1
+    path: Assets/Scenes/BakedLighting/BakedLighting.unity
+    guid: 43824ae4828695f4984fd626d4fc9c23
   m_configObjects: {}

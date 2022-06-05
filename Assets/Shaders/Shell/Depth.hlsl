@@ -194,18 +194,13 @@ void geom(triangle v2g input[3], inout TriangleStream<g2f> stream)
 #endif
 //-----------------------------------(above) For Microsoft Shader Model < 4.1-----------------------------------
 
-// Previous frag() causes Depth Priming error (black pixels),
-// when enabling "Depth Priming + MSAA" in URP 12.1.
 float frag(g2f input) : SV_TARGET
 {
     float4 furColor = SAMPLE_TEXTURE2D(_FurMap, sampler_FurMap, input.uv / _BaseMap_ST.xy * _FurScale);
     float alpha = furColor.r * (1.0 - input.layer);
     if (input.layer > 0.0 && alpha < _AlphaCutout) discard;
 
-    // Divided by w of PositionCS gets wrong depth when enabling depth priming (Depth Prepass) on URP 12.1.
-    //return input.vertex.z;
-    float outDepth = input.vertex.z / input.vertex.w;
-    return outDepth;
+    return input.vertex.z;
     //outColor = outDepth = input.vertex.z / input.vertex.w;
 }
 #endif

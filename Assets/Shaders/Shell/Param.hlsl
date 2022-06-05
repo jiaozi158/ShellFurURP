@@ -40,5 +40,4 @@ float _Area;
 float _MedulaScatter;
 float _MedulaAbsorb;
 float _Kappa;
-
 #endif

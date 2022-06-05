@@ -5,7 +5,7 @@ Properties
 {
     [Header(Basic)][Space]
     [MainColor] _BaseColor("Color", Color) = (1.0, 1.0, 1.0, 1.0)
-    _BaseMap("Albedo", 2D) = "white" {}
+    [MainTexture] _BaseMap("Albedo", 2D) = "white" {}
     _Smoothness("Smoothness", Range(0.0, 0.66)) = 0.0
 
     [Header(Shell)][Space]
@@ -36,7 +36,7 @@ Properties
 
     [Space][Header(Marschner Specular)][Space]
     [Toggle(_FUR_SPECULAR)] _FurSpecular("Enable", Float) = 1
-    [Toggle(_FUR_SPECULAR_DEFERRED)] _FurSpecularDeferredAdditional("(Slow) Support Deferred Path", Float) = 0
+    [Toggle(_FUR_SPECULAR_DEFERRED)] _FurSpecularDeferred("(Slow) Support Deferred Path", Float) = 0
     _FurSmoothness("Fur Smoothness", Range(0.0, 1.0)) = 0.45
     _Backlit("Backlit", Range(0.0, 1.0)) = 0.25
     _Area("Lit Area", Range(0.01, 1.0)) = 0.1
@@ -112,13 +112,14 @@ SubShader
         // Unity Keywords
         #pragma multi_compile _ DIRLIGHTMAP_COMBINED
         #pragma multi_compile _ LIGHTMAP_ON
+        #pragma multi_compile _ DYNAMICLIGHTMAP_ON
         #pragma multi_compile_fog
         #pragma multi_compile_instancing
         #pragma multi_compile _ DOTS_INSTANCING_ON
         #pragma multi_compile_fragment _ DEBUG_DISPLAY
 
-        #pragma prefer_hlslcc gles
-        #pragma exclude_renderers d3d11_9x
+        //#pragma prefer_hlslcc gles
+        #pragma exclude_renderers gles
         // if "_GEOM_INSTANCING", then Microsoft ShaderModel 4.1 (geometry shader instancing support)
         // It is "target 4.6" in Unity. (Tested on OpenGL 4.1, instancing not supported on OpenGL 4.0)
         #pragma target 4.6 _GEOM_INSTANCING
@@ -221,14 +222,16 @@ SubShader
         #pragma multi_compile _ _GEOM_INSTANCING
 
         // Unity Keywords
+        #pragma multi_compile _ LIGHTMAP_SHADOW_MIXING
         #pragma multi_compile _ DIRLIGHTMAP_COMBINED
         #pragma multi_compile _ LIGHTMAP_ON
+        #pragma multi_compile _ DYNAMICLIGHTMAP_ON
         #pragma multi_compile_fog
         #pragma multi_compile_instancing
         #pragma multi_compile _ DOTS_INSTANCING_ON
 
         //#pragma prefer_hlslcc gles
-        #pragma exclude_renderers d3d11_9x
+        #pragma exclude_renderers gles
         // if "_GEOM_INSTANCING", then Microsoft ShaderModel 4.1 (geometry shader instancing support)
         // It is "target 4.6" in Unity. (Tested on OpenGL 4.1, instancing not supported on OpenGL 4.0)
         #pragma target 4.6 _GEOM_INSTANCING
@@ -237,6 +240,27 @@ SubShader
         #pragma geometry geom
         #pragma fragment frag
         #include "./LitGBuffer.hlsl"
+        ENDHLSL
+    }
+
+    // Meta pass is used for (static/dynamic) lightmap baking only.
+    Pass
+    {
+        Name "Meta"
+        Tags { "LightMode" = "Meta" }
+
+        Cull Off
+
+        HLSLPROGRAM
+        #pragma shader_feature EDITOR_VISUALIZATION
+
+        #pragma exclude_renderers gles
+
+        #include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
+        #include "Packages/com.unity.render-pipelines.universal/Shaders/LitMetaPass.hlsl"
+
+        #pragma vertex UniversalVertexMeta
+        #pragma fragment UniversalFragmentMetaLit
         ENDHLSL
     }
 
@@ -273,13 +297,13 @@ SubShader
         // Unity Keywords
         #pragma multi_compile _ DIRLIGHTMAP_COMBINED
         #pragma multi_compile _ LIGHTMAP_ON
+        #pragma multi_compile _ DYNAMICLIGHTMAP_ON
         #pragma multi_compile_fog
         #pragma multi_compile_instancing
         #pragma multi_compile _ DOTS_INSTANCING_ON
         #pragma multi_compile_fragment _ DEBUG_DISPLAY
 
-        #pragma prefer_hlslcc gles
-        #pragma exclude_renderers d3d11_9x
+        #pragma exclude_renderers gles
         #pragma vertex vert
         #pragma require geometry
         #pragma geometry geom
@@ -375,14 +399,15 @@ SubShader
         #pragma multi_compile_fragment _ _FUR_SPECULAR_DEFERRED
 
         // Unity Keywords
+        #pragma multi_compile _ LIGHTMAP_SHADOW_MIXING
         #pragma multi_compile _ DIRLIGHTMAP_COMBINED
         #pragma multi_compile _ LIGHTMAP_ON
+        #pragma multi_compile _ DYNAMICLIGHTMAP_ON
         #pragma multi_compile_fog
         #pragma multi_compile_instancing
         #pragma multi_compile _ DOTS_INSTANCING_ON
 
-        //#pragma prefer_hlslcc gles
-        #pragma exclude_renderers d3d11_9x
+        #pragma exclude_renderers gles
         #pragma vertex vert
         #pragma require geometry
         #pragma geometry geom
