@@ -5,9 +5,10 @@ ShellFurURP
  
  Based on hecomi's [UnityFurURP](https://github.com/hecomi/UnityFurURP).
  
- Containing two demo scenes:
+ Containing three demo scenes:
  - High Fidelity
  - Performant
+ - BakedLighting
  
  Please change the Project Quality from "HighFidelity" to "Performant" if opening "Performant" scene.
  
@@ -24,6 +25,12 @@ Screenshots
  ![Performant1](https://github.com/jiaozi158/ShellFurURP/blob/main/Documentation/Images/Demo/Performant/Performant1_new.jpg)
  
  ![Performant2](https://github.com/jiaozi158/ShellFurURP/blob/main/Documentation/Images/Demo/Performant/Performant2_new.jpg)
+ 
+ **(BakedLighting Scene)**
+ 
+ Using Enlighten Realtime GI because I did not create a proper lightmapUV (which Progressive Lightmapper requires) for "PlushyToy" mesh.
+ 
+ ![BakedLighting1](https://github.com/jiaozi158/ShellFurURP/blob/main/Documentation/Images/Demo/BakedLighting/BakedLighting1_new.jpg)
 
 all with SSAA X16 enabled. (current URP does not have effective AA method.)
 
