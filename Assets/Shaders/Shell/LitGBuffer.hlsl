@@ -47,10 +47,9 @@ struct g2f
     float3 tangentWS : TEXCOORD2;
     float2 uv : TEXCOORD4;
     DECLARE_LIGHTMAP_OR_SH(staticLightmapUV, vertexSH, 5);
-    float fogFactor : TEXCOORD6;
-    float  layer : TEXCOORD7;
+    float  layer : TEXCOORD6;
 #ifdef DYNAMICLIGHTMAP_ON
-    float2  dynamicLightmapUV : TEXCOORD8;
+    float2  dynamicLightmapUV : TEXCOORD7;
 #endif
     UNITY_VERTEX_INPUT_INSTANCE_ID
     UNITY_VERTEX_OUTPUT_STEREO
@@ -127,8 +126,6 @@ void AppendShellVertex(inout TriangleStream<g2f> stream, v2g input, int index)
     output.tangentWS = normalInput.tangentWS;
     output.layer = layer;
 
-    output.fogFactor = ComputeFogFactor(vertexInput.positionCS.z);
-
     OUTPUT_LIGHTMAP_UV(input.staticLightmapUV, unity_LightmapST, output.staticLightmapUV);
 #ifdef DYNAMICLIGHTMAP_ON
     output.dynamicLightmapUV = input.dynamicLightmapUV;
@@ -187,8 +184,6 @@ void AppendShellVertexInstancing(inout TriangleStream<g2f> stream, v2g input, in
     output.normalWS = normalInput.normalWS;
     output.tangentWS = normalInput.tangentWS;
     output.layer = layer;
-
-    output.fogFactor = ComputeFogFactor(vertexInput.positionCS.z);
 
     OUTPUT_LIGHTMAP_UV(input.staticLightmapUV, unity_LightmapST, output.staticLightmapUV);
 #ifdef DYNAMICLIGHTMAP_ON
@@ -277,7 +272,7 @@ FragmentOutput frag(g2f input)
 #else
     inputData.shadowCoord = half4(0, 0, 0, 0);
 #endif
-    inputData.fogCoord = input.fogFactor;
+    inputData.fogCoord = 0.0; // URP doesn't apply fog in gbuffer pass.
 
     // Vertex Lighting will not be supported as it is not fast enough when calculating so many vertices (in geometry shader).
     inputData.vertexLighting = half3(0, 0, 0);
@@ -288,6 +283,9 @@ FragmentOutput frag(g2f input)
 #else
     inputData.bakedGI = SAMPLE_GI(input.staticLightmapUV, input.vertexSH, inputData.normalWS);
 #endif
+
+    inputData.normalizedScreenSpaceUV = GetNormalizedScreenSpaceUV(input.positionCS);
+    inputData.shadowMask = SAMPLE_SHADOWMASK(input.staticLightmapUV);
 
     SETUP_DEBUG_TEXTURE_DATA(inputData, input.uv, _BaseMap);
 

@@ -183,8 +183,6 @@ void AppendShellVertexInstancing(inout TriangleStream<g2f> stream, v2g input, in
     output.tangentWS = normalInput.tangentWS;
     output.layer = layer;
 
-    float3 vertexLight = VertexLighting(vertexInput.positionWS, normalInput.normalWS);
-
     output.fogFactor = 0;
 #if !defined(_FOG_FRAGMENT)
     output.fogFactor = ComputeFogFactor(vertexInput.positionCS.z);
