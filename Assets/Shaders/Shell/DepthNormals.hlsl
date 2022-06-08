@@ -9,19 +9,21 @@
 
 struct Attributes
 {
-    half4 positionOS : POSITION;
-    half3 normalOS : NORMAL;
-    half4 tangentOS : TANGENT;
+    float4 positionOS : POSITION;
+    float3 normalOS : NORMAL;
+    float4 tangentOS : TANGENT;
     float2 uv : TEXCOORD0;
     UNITY_VERTEX_INPUT_INSTANCE_ID
 };
 
 struct v2g
 {
-    half4 positionOS : POSITION;
-    half3 normalOS : NORMAL;
-    half4 tangentOS : TANGENT;
+    float4 positionOS : POSITION;
+    float3 normalWS : NORMAL;
+    float3 tangentWS : TANGENT;
     float2 uv : TEXCOORD0;
+    float3 groomWS : TEXCOORD1;
+    float furLength : TEXCOORD2;
     UNITY_VERTEX_INPUT_INSTANCE_ID
 };
 
@@ -29,11 +31,9 @@ struct g2f
 {
     float4 vertex : SV_POSITION;
     float2 uv : TEXCOORD0;
-    //float  fogCoord : TEXCOORD1;
     float  layer : TEXCOORD1;
     float3 normalWS : TEXCOORD2;
     float3 tangentWS : TEXCOORD3;
-    float3 posWS : TEXCOORD4;
     UNITY_VERTEX_INPUT_INSTANCE_ID
     UNITY_VERTEX_OUTPUT_STEREO
 };
@@ -44,14 +44,24 @@ v2g vert(Attributes input)
     // setup the instanced id
     UNITY_SETUP_INSTANCE_ID(input);
     // set all values in the "v2g output" to 0.0
-    // This is the URP version of UNITY_INITIALIZE_OUTPUT()
     ZERO_INITIALIZE(v2g, output);
     // copy instance id in the "Attributes input" to the "v2g output"
     UNITY_TRANSFER_INSTANCE_ID(input, output);
 
+    VertexNormalInputs normalInput = GetVertexNormalInputs(input.normalOS, input.tangentOS);
+
+    // Fur Direction and Length (reusable data for geometry shader)
+    float3 groomTS = SafeNormalize(UnpackNormal(SAMPLE_TEXTURE2D_LOD(_FurDirMap, sampler_FurDirMap, input.uv / _BaseMap_ST.xy, 0).xyzw));
+
+    output.groomWS = SafeNormalize(TransformTangentToWorld(
+        groomTS,
+        float3x3(normalInput.tangentWS, normalInput.bitangentWS, normalInput.normalWS)));
+
+    output.furLength = SAMPLE_TEXTURE2D_LOD(_FurLengthMap, sampler_FurLengthMap, input.uv / _BaseMap_ST.xy, 0).x;
+
     output.positionOS = input.positionOS;
-    output.normalOS = input.normalOS;
-    output.tangentOS = input.tangentOS;
+    output.normalWS = normalInput.normalWS;
+    output.tangentWS = normalInput.tangentWS;
     output.uv = input.uv;
     return output;
 }
@@ -67,7 +77,6 @@ void AppendShellVertex(inout TriangleStream<g2f> stream, v2g input, int index)
     UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
 
     VertexPositionInputs vertexInput = GetVertexPositionInputs(input.positionOS.xyz);
-    VertexNormalInputs normalInput = GetVertexNormalInputs(input.normalOS, input.tangentOS);
 
     float clampedShellAmount = clamp(_ShellAmount, 1, 13);
     _ShellStep = _TotalShellStep / clampedShellAmount;
@@ -82,29 +91,21 @@ void AppendShellVertex(inout TriangleStream<g2f> stream, v2g input, int index)
     // Fur Direction
     float layer = (float)index / clampedShellAmount;
 
-    float3 groomTS = SafeNormalize(UnpackNormal(SAMPLE_TEXTURE2D_LOD(_FurDirMap, sampler_FurDirMap, input.uv / _BaseMap_ST.xy, 0).xyzw));
-
-    float3 groomWS = SafeNormalize(TransformTangentToWorld(
-        groomTS,
-        float3x3(normalInput.tangentWS, normalInput.bitangentWS, normalInput.normalWS)));
-
     float bent = _BentType * layer + (1 - _BentType);
 
-    groomWS = lerp(normalInput.normalWS, groomWS, _GroomingIntensity * bent);
+    float3 groomWS = lerp(input.normalWS, input.groomWS, _GroomingIntensity * bent);
     float3 shellDir = SafeNormalize(groomWS + move + windMove);
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    float FurLength = SAMPLE_TEXTURE2D_LOD(_FurLengthMap, sampler_FurLengthMap, input.uv / _BaseMap_ST.xy, 0).x;
-    float3 posWS = vertexInput.positionWS + shellDir * (_ShellStep * index * FurLength * _FurLengthIntensity);
+    float3 posWS = vertexInput.positionWS + shellDir * (_ShellStep * index * input.furLength * _FurLengthIntensity);
     float4 posCS = TransformWorldToHClip(posWS);
 
     output.vertex = posCS;
-    output.posWS = posWS;
     output.uv = TRANSFORM_TEX(input.uv, _BaseMap);
     output.layer = layer;
 
-    output.normalWS = normalInput.normalWS;
-    output.tangentWS = normalInput.tangentWS;
+    output.normalWS = input.normalWS;
+    output.tangentWS = input.tangentWS;
 
 
     stream.Append(output);
@@ -122,7 +123,6 @@ void AppendShellVertexInstancing(inout TriangleStream<g2f> stream, v2g input, in
     UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
 
     VertexPositionInputs vertexInput = GetVertexPositionInputs(input.positionOS.xyz);
-    VertexNormalInputs normalInput = GetVertexNormalInputs(input.normalOS, input.tangentOS);
 
     _ShellStep = _TotalShellStep / _ShellAmount;
 
@@ -136,29 +136,21 @@ void AppendShellVertexInstancing(inout TriangleStream<g2f> stream, v2g input, in
     // Fur Direction
     float layer = (float)index / _ShellAmount;
 
-    float3 groomTS = SafeNormalize(UnpackNormal(SAMPLE_TEXTURE2D_LOD(_FurDirMap, sampler_FurDirMap, input.uv / _BaseMap_ST.xy, 0).xyzw));
-
-    float3 groomWS = SafeNormalize(TransformTangentToWorld(
-        groomTS,
-        float3x3(normalInput.tangentWS, normalInput.bitangentWS, normalInput.normalWS)));
-
     float bent = _BentType * layer + (1 - _BentType);
 
-    groomWS = lerp(normalInput.normalWS, groomWS, _GroomingIntensity * bent);
+    float3 groomWS = lerp(input.normalWS, input.groomWS, _GroomingIntensity * bent);
     float3 shellDir = SafeNormalize(groomWS + move + windMove);
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    float FurLength = SAMPLE_TEXTURE2D_LOD(_FurLengthMap, sampler_FurLengthMap, input.uv / _BaseMap_ST.xy, 0).x;
-    float3 posWS = vertexInput.positionWS + shellDir * (_ShellStep * index * FurLength * _FurLengthIntensity);
+    float3 posWS = vertexInput.positionWS + shellDir * (_ShellStep * index * input.furLength * _FurLengthIntensity);
     float4 posCS = TransformWorldToHClip(posWS);
 
     output.vertex = posCS;
-    output.posWS = posWS;
     output.uv = TRANSFORM_TEX(input.uv, _BaseMap);
     output.layer = layer;
 
-    output.normalWS = normalInput.normalWS;
-    output.tangentWS = normalInput.tangentWS;
+    output.normalWS = input.normalWS;
+    output.tangentWS = input.tangentWS;
 
 
     stream.Append(output);
@@ -208,11 +200,12 @@ float4 frag(g2f input) : SV_Target
     float alpha = furColor.r * (1.0 - input.layer);
     if (input.layer > 0.0 && alpha < _AlphaCutout) discard;
 
-    float3 viewDirWS = SafeNormalize(GetCameraPositionWS() - input.posWS);
-    half3 normalTS = UnpackNormalScale(
+    float3 normalTS = UnpackNormalScale(
         SAMPLE_TEXTURE2D(_NormalMap, sampler_NormalMap, input.uv / _BaseMap_ST.xy * _FurScale),
         _NormalScale);
-    float3 bitangent = SafeNormalize(viewDirWS.y * cross(input.normalWS, input.tangentWS));
+
+    // 1.0 should be tangentOS.w.
+    float3 bitangent = SafeNormalize(1.0 * cross(input.normalWS, input.tangentWS));
     float3 normalWS = SafeNormalize(TransformTangentToWorld(
         normalTS,
         float3x3(input.tangentWS, bitangent, input.normalWS)));

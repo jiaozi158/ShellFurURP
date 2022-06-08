@@ -6,33 +6,33 @@ Properties
     [Header(Basic)][Space]
     [MainColor] _BaseColor("Color", Color) = (1.0, 1.0, 1.0, 1.0)
     [MainTexture] _BaseMap("Albedo", 2D) = "white" {}
-    _Smoothness("Smoothness", Range(0.0, 0.66)) = 0.0
+    [Space]_Smoothness("Smoothness", Range(0.0, 0.66)) = 0.0
 
     [Header(Shell)][Space]
     [Space][NoScaleOffset]_FurMap("Shell Noise", 2D) = "white" {}
-    _FurScale("Shell Scale", Range(0.0, 10.0)) = 1.0
+    [Space]_FurScale("Shell Scale", Range(0.0, 10.0)) = 1.0
     _AlphaCutout("Fur Cutout", Range(0.05, 0.5)) = 0.2
-    [Space][Space][NoScaleOffset][Normal] _NormalMap("Shell Normal", 2D) = "bump" {}
-    _NormalScale("Normal Scale", Range(0.0, 2.0)) = 1.0
+    [Space(10)][NoScaleOffset][Normal] _NormalMap("Shell Normal", 2D) = "bump" {}
+    [Space]_NormalScale("Normal Scale", Range(0.0, 2.0)) = 1.0
 
-    [Space][Space]
+    [Space(10)]
     [Toggle(_GEOM_INSTANCING)] _GeomInstancing("(Slow) More Shell Amount", Float) = 0
-    [IntRange] _ShellAmount("Shell Amount", Range(1, 52)) = 13
+    [Space(10)][IntRange] _ShellAmount("Shell Amount", Range(1, 52)) = 13
 
     // Replaced by "Total Shell Step".
     [HideInInspector] _ShellStep("Shell Step", Range(0.0, 0.02)) = 0.001
 
-    [Space][Space] _TotalShellStep("Total Shell Step", Range(0.0, 0.5)) = 0.026
+    _TotalShellStep("Total Shell Step", Range(0.0, 0.5)) = 0.026
 
     [Space][Header(Advanced)][Space]
 
     [NoScaleOffset]_AOMap("Mesh AO Map", 2D) = "white" {}
-    _Occlusion("Occlusion", Range(0.0, 1.0)) = 0.25
-    [Space][Space][NoScaleOffset] _FurLengthMap("Fur Length Map", 2D) = "white" {}
+    [Space]_Occlusion("Occlusion", Range(0.0, 1.0)) = 0.25
+    [Space(10)][NoScaleOffset] _FurLengthMap("Fur Length Map", 2D) = "white" {}
     _FurLengthIntensity("Length Intensity", Range(0.01, 5.0)) = 1.0
-    [Space][Space][NoScaleOffset] _FurDirMap("Fur Direction Map", 2D) = "bump" {}
-    _GroomingIntensity("Direction Intensity", Range(0.0, 1.0)) = 1.0
-    [Space][Enum(Linear, 0, Quadratic, 1)]_BentType("Fur Bent Type", float) = 1
+    [Space(10)][NoScaleOffset] _FurDirMap("Fur Direction Map", 2D) = "bump" {}
+    [Space]_GroomingIntensity("Direction Intensity", Range(0.0, 1.0)) = 1.0
+    [Space(10)][Enum(Linear, 0, Quadratic, 1)]_BentType("Fur Bent Type", float) = 1
 
     [Space][Header(Marschner Specular)][Space]
     [Toggle(_FUR_SPECULAR)] _FurSpecular("Enable", Float) = 1
@@ -48,15 +48,15 @@ Properties
     _RimLightPower("Rim Light Power", Range(1.0, 20.0)) = 10.0
     _RimLightIntensity("Rim Light Intensity", Range(0.0, 1.0)) = 0.0
 
-    [Header(Shadows)][Space]
+    [Space][Header(Shadows)][Space]
     _ShadowExtraBias("Shadow Extra Bias", Range(-1.0, 1.0)) = 0.0
     [Toggle(_NO_FUR_SHADOW)] _NoFurShadow("(Fast) Mesh Shadow Only", Float) = 1
 
     [Space][Header(Others)][Space]
-    [Space][Gamma] _Metallic("Metallic", Range(0.0, 1.0)) = 0.0
-    [Space][ToggleOff] _SpecularHighlights("Specular Highlights On", Float) = 0.0
+    [Gamma] _Metallic("Metallic", Range(0.0, 1.0)) = 0.0
+    [ToggleOff] _SpecularHighlights("Specular Highlights On", Float) = 0.0
 
-    [Space]
+
     _BaseMove("Base Move", Vector) = (0.0, 0.0, 0.0, 3.0)
     _WindFreq("Wind Freq", Vector) = (0.5, 0.7, 0.9, 1.0)
     _WindMove("Wind Move", Vector) = (0.0, 0.0, 0.0, 1.0)
