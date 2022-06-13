@@ -36,8 +36,7 @@ all with SSAA X16 enabled. (current URP does not have effective AA method.)
 
 Documentation
 ------------
-Documentation is not ready yet.
-You may try the demo first.
+You can find it [here](https://github.com/jiaozi158/ShellFurURP/blob/main/Documentation/Documentation.md).
 
 Requirements
 ------------

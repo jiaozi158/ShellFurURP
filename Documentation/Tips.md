@@ -4,11 +4,15 @@ TIPS
 IMPORTANT
 ------------
 
-Before customizing the fur, you should ensure the model has even UV(s).
+Before customizing the fur, you should ensure that the model has even UV.
 
 evenly mapped UV:
 
+ ![EvenlyMappedUV](https://github.com/jiaozi158/ShellFurURP/blob/main/Documentation/Images/Tips/EvenlyMappedUV.png)
+
 unevenly mapped UV:
+
+ ![UnevenlyMappedUV](https://github.com/jiaozi158/ShellFurURP/blob/main/Documentation/Images/Tips/UnevenlyMappedUV.png)
 
 
 Performance Tips
@@ -28,5 +32,5 @@ Higher Fidelity Tips
 
 You may increase the maximum shell layers to improve fur quality. (52 shells -> more)
 
-Please click here for detailed instructions.
+Please click [here (unfinished)]() for detailed instructions.
 
