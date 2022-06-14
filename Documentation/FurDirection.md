@@ -9,9 +9,11 @@ If you are familiar with texture baking, the process is as follows:
 
 - Bake an **Object Space** normal map for this mesh.
 
-- Apply this normal map to mesh and bake **Tangent Space** normal map.
+- Apply this normal map to (original) mesh and bake **Tangent Space** normal map.
 
 - Assign the **(Tangent Space)** normal map to Fur Direction Map.
+
+- In Unity Editor, "Import Tangents" or "Calculate MikktSpace Tangents" for the mesh. **(See Step 15)**
 
 If you would like to create it in Unity Editor, you may try [this](https://github.com/unity3d-jp/NormalPainter). (Untested, and only avaliable in Unity 2017)
 
