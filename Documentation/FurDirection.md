@@ -7,7 +7,7 @@ If you are familiar with texture baking, the process is as follows:
 
 - Edit surface normal direction of the mesh.
 
-- Bake a **Object Space** normal map for this mesh.
+- Bake an **Object Space** normal map for this mesh.
 
 - Apply this normal map to mesh and bake **Tangent Space** normal map.
 
