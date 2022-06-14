@@ -145,3 +145,11 @@ If you would like to support blackears, you can buy this free add-on at [blender
     It is suggested to use 0% compression or 100% (Loseless)
     
     ![OutputBakedFurDirectionMap](https://github.com/jiaozi158/ShellFurURP/blob/main/Documentation/Images/Direction/18_OutputBakedNormalTSMap.jpg)
+
+15. In Unity Editor, make sure your mesh has tangents.
+
+    
+
+    You may set "Tangents" to "Import" if the mesh has tangents, or set it to "Calculate Mikktspace".
+
+    ![SetTangentsInUnityEditor](https://github.com/jiaozi158/ShellFurURP/blob/main/Documentation/Images/Direction/19_SetMeshTangents.jpg)
