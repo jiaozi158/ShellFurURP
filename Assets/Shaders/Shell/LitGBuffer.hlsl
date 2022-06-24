@@ -1,8 +1,7 @@
 #ifndef FUR_SHELL_LIT_DEFERRED_HLSL
 #define FUR_SHELL_LIT_DEFERRED_HLSL
 
-#include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
-//#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SurfaceInput.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SurfaceInput.hlsl"
 #include "./Param.hlsl"
 #include "./Common.hlsl"
 #if defined(_FUR_SPECULAR) && defined(_FUR_SPECULAR_DEFERRED)
@@ -103,7 +102,7 @@ void AppendShellVertex(inout TriangleStream<g2f> stream, v2g input, int index)
     VertexPositionInputs vertexInput = GetVertexPositionInputs(input.positionOS.xyz);
 
     float clampedShellAmount = clamp(_ShellAmount, 1, 13);
-    _ShellStep = _TotalShellStep / clampedShellAmount;
+    float shellStep = _TotalShellStep / clampedShellAmount;
 
     float moveFactor = pow(abs((float)index / clampedShellAmount), _BaseMove.w);
     float3 posOS = input.positionOS.xyz;
@@ -121,7 +120,7 @@ void AppendShellVertex(inout TriangleStream<g2f> stream, v2g input, int index)
     float3 shellDir = SafeNormalize(groomWS + move + windMove);
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    output.positionWS = vertexInput.positionWS + shellDir * (_ShellStep * index * input.furLength * _FurLengthIntensity);
+    output.positionWS = vertexInput.positionWS + shellDir * (shellStep * index * input.furLength * _FurLengthIntensity);
     output.positionCS = TransformWorldToHClip(output.positionWS);
     output.uv = TRANSFORM_TEX(input.texcoord, _BaseMap);
     output.normalWS = input.normalWS;
@@ -151,7 +150,7 @@ void AppendShellVertexInstancing(inout TriangleStream<g2f> stream, v2g input, in
 
     VertexPositionInputs vertexInput = GetVertexPositionInputs(input.positionOS.xyz);
 
-    _ShellStep = _TotalShellStep / _ShellAmount;
+    float shellStep = _TotalShellStep / _ShellAmount;
 
     float moveFactor = pow(abs((float)index / _ShellAmount), _BaseMove.w);
     float3 posOS = input.positionOS.xyz;
@@ -169,7 +168,7 @@ void AppendShellVertexInstancing(inout TriangleStream<g2f> stream, v2g input, in
     float3 shellDir = SafeNormalize(groomWS + move + windMove);
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    output.positionWS = vertexInput.positionWS + shellDir * (_ShellStep * index * input.furLength * _FurLengthIntensity);
+    output.positionWS = vertexInput.positionWS + shellDir * (shellStep * index * input.furLength * _FurLengthIntensity);
     output.positionCS = TransformWorldToHClip(output.positionWS);
     output.uv = TRANSFORM_TEX(input.texcoord, _BaseMap);
     output.normalWS = input.normalWS;
@@ -243,22 +242,30 @@ FragmentOutput frag(g2f input)
         normalTS,
         float3x3(input.tangentWS, bitangent, input.normalWS)));
 
-    SurfaceData surfaceData;
-    InitializeStandardLitSurfaceData(input.uv, surfaceData);
+    SurfaceData surfaceData = (SurfaceData)0;
 
-// LOD cross fade is still in 2022 beta, test it in the future.
-#ifdef LOD_FADE_CROSSFADE
-    LODFadeCrossFade(input.positionCS);
-#endif
+    // Avoid using it to support SRP Batching.
+    //InitializeStandardLitSurfaceData(input.uv, surfaceData);
+
+    half4 albedoAlpha = SampleAlbedoAlpha(input.uv, TEXTURE2D_ARGS(_BaseMap, sampler_BaseMap));
+    surfaceData.albedo = albedoAlpha.rgb * _BaseColor.rgb;
+    surfaceData.alpha = 1.0;
+    surfaceData.metallic = _Metallic;
+    surfaceData.smoothness = _Smoothness;
 
     half AO = (1.0 - SAMPLE_TEXTURE2D(_AOMap, sampler_AOMap, input.uv / _BaseMap_ST.xy).x) * _Occlusion;
     surfaceData.occlusion = (1.0 - AO) * lerp(1.0 - _Occlusion * _Occlusion, 1.0, input.layer);
+
+#ifdef LOD_FADE_CROSSFADE
+    LODFadeCrossFade(input.positionCS);
+#endif
 
     InputData inputData = (InputData)0;
     inputData.positionWS = input.positionWS;
     inputData.normalWS = normalWS;
     inputData.viewDirectionWS = viewDirWS;
-#if defined(_MAIN_LIGHT_SHADOWS) || defined(_MAIN_LIGHT_SHADOWS_CASCADE) || defined(_MAIN_LIGHT_SHADOWS_SCREEN) && !defined(_RECEIVE_SHADOWS_OFF)
+//#if defined(_MAIN_LIGHT_SHADOWS) || defined(_MAIN_LIGHT_SHADOWS_CASCADE) || defined(_MAIN_LIGHT_SHADOWS_SCREEN) && !defined(_RECEIVE_SHADOWS_OFF)
+#if defined(MAIN_LIGHT_CALCULATE_SHADOWS)
     inputData.shadowCoord = TransformWorldToShadowCoord(input.positionWS);
 #else
     inputData.shadowCoord = half4(0, 0, 0, 0);
@@ -284,13 +291,20 @@ FragmentOutput frag(g2f input)
     ApplyDecalToSurfaceData(input.positionCS, surfaceData, inputData);
 #endif
 
-    half3 rimColor = half3(0.0, 0.0, 0.0);
+    // Get the main light.
+    Light mainLight = GetMainLight(inputData.shadowCoord, inputData.positionWS, inputData.shadowMask);
+
     half3 color = half3(0.0, 0.0, 0.0);
+
+#if defined(_FUR_RIM_LIGHTING) && defined (_FUR_RIM_LIGHTING_DEFERRED)
+    // Calculate Rim Light
+    ApplyRimLightDeferred(color, input.positionWS, viewDirWS, normalWS, inputData);
+#endif
     
 #if defined(_FUR_SPECULAR) && defined(_FUR_SPECULAR_DEFERRED)
     // Use abs(f) to avoid warning messages that f should not be negative in pow(f, e).
     SurfaceOutputFur s = (SurfaceOutputFur)0;
-    s.Albedo = abs(surfaceData.albedo * _BaseColor.rgb);
+    s.Albedo = abs(surfaceData.albedo);
     s.MedulaScatter = abs(_MedulaScatter);
     s.MedulaAbsorb = abs(1.0 - _MedulaAbsorb);
     // Convert smoothness to roughness, (1 - smoothness) is perceptual roughness.
@@ -298,22 +312,20 @@ FragmentOutput frag(g2f input)
     s.Layer = input.layer;
     s.Kappa = (1.0 - _Kappa / 2.0);
 
-    // Get the main light.
-    Light dirLight = GetMainLight();
-
 #ifdef _LIGHT_LAYERS
+    #if (UNITY_VERSION >= 202220)
+    uint meshRenderingLayers = GetMeshRenderingLayer();
+    #else
     uint meshRenderingLayers = GetMeshRenderingLightLayer();
-    if (IsMatchingLightLayer(dirLight.layerMask, meshRenderingLayers))
+    #endif
+    if (IsMatchingLightLayer(mainLight.layerMask, meshRenderingLayers))
 #endif
     {
-        half3 mainLightColor = dirLight.color.rgb * dirLight.distanceAttenuation;
+        half3 mainLightColor = mainLight.color.rgb * mainLight.distanceAttenuation;
         // "Screen" blend mode.
         mainLightColor = (1 - (1 - s.Albedo) * (1 - mainLightColor));
 
-        // Calculate Rim Light
-        ApplyRimLightDeferred(rimColor, input.positionWS, viewDirWS, normalWS);
-
-        color += (mainLightColor * FurBSDFYan(s, dirLight.direction, viewDirWS, normalWS, 1.0, _Backlit, _Area))+rimColor;
+        color += (mainLightColor * FurBSDFYan(s, mainLight.direction, viewDirWS, normalWS, 1.0, _Backlit, _Area));
     }
 
     // Additional Lights in deferred can be very slow. (not suggested)
@@ -341,7 +353,6 @@ FragmentOutput frag(g2f input)
     BRDFData brdfData;
     InitializeBRDFData(surfaceData.albedo, surfaceData.metallic, surfaceData.specular, surfaceData.smoothness, surfaceData.alpha, brdfData);
 
-    Light mainLight = GetMainLight(inputData.shadowCoord, inputData.positionWS, inputData.shadowMask);
     MixRealtimeAndBakedGI(mainLight, inputData.normalWS, inputData.bakedGI, inputData.shadowMask);
 
     // Store GI, Emission, Rim Light, and Fur Specular in the GBuffer3.

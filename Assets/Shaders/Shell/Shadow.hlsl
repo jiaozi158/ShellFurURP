@@ -3,12 +3,14 @@
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/CommonMaterial.hlsl"
-// Declare "_BaseMap_ST".
-#include "Packages/com.unity.render-pipelines.universal/Shaders/UnlitInput.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SurfaceInput.hlsl"
 #include "./Param.hlsl"
 #include "./Common.hlsl"
 // For VR single pass instance compability:
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+#if defined(LOD_FADE_CROSSFADE)
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/LODCrossFade.hlsl"
+#endif
 
 struct Attributes
 {
@@ -81,7 +83,7 @@ void AppendShellVertex(inout TriangleStream<g2f> stream, v2g input, int index)
     VertexPositionInputs vertexInput = GetVertexPositionInputs(input.positionOS.xyz);
 
     float clampedShellAmount = clamp(_ShellAmount, 1, 13);
-    _ShellStep = _TotalShellStep / clampedShellAmount;
+    float shellStep = _TotalShellStep / clampedShellAmount;
 
     float moveFactor = pow(abs((float)index / clamp(_ShellAmount, 1, 13)), _BaseMove.w);
     float3 posOS = input.positionOS.xyz;
@@ -99,7 +101,7 @@ void AppendShellVertex(inout TriangleStream<g2f> stream, v2g input, int index)
     float3 shellDir = SafeNormalize(groomWS + move + windMove);
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    float3 posWS = vertexInput.positionWS + shellDir * (_ShellStep * index * input.furLength * _FurLengthIntensity);
+    float3 posWS = vertexInput.positionWS + shellDir * (shellStep * index * input.furLength * _FurLengthIntensity);
 
     float4 posCS = GetShadowPositionHClip(posWS, input.normalWS);
     
@@ -123,7 +125,7 @@ void AppendShellVertexInstancing(inout TriangleStream<g2f> stream, v2g input, in
 
     VertexPositionInputs vertexInput = GetVertexPositionInputs(input.positionOS.xyz);
 
-    _ShellStep = _TotalShellStep / _ShellAmount;
+    float shellStep = _TotalShellStep / _ShellAmount;
 
     float moveFactor = pow(abs((float)index / _ShellAmount), _BaseMove.w);
     float3 posOS = input.positionOS.xyz;
@@ -141,7 +143,7 @@ void AppendShellVertexInstancing(inout TriangleStream<g2f> stream, v2g input, in
     float3 shellDir = SafeNormalize(groomWS + move + windMove);
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    float3 posWS = vertexInput.positionWS + shellDir * (_ShellStep * index * input.furLength * _FurLengthIntensity);
+    float3 posWS = vertexInput.positionWS + shellDir * (shellStep * index * input.furLength * _FurLengthIntensity);
 
     float4 posCS = GetShadowPositionHClip(posWS, input.normalWS);
 
@@ -160,6 +162,7 @@ void AppendShellVertexInstancing(inout TriangleStream<g2f> stream, v2g input, in
 void geom(triangle v2g input[3], inout TriangleStream<g2f> stream, uint instanceID : SV_GSInstanceID)
 {
 #if defined(_NO_FUR_SHADOW)
+
     [unroll] for (float j = 0; j < 3; ++j)
     {
         AppendShellVertexInstancing(stream, input[j], 0);
@@ -216,6 +219,10 @@ half4 frag(g2f input) : SV_TARGET
     float4 furColor = SAMPLE_TEXTURE2D(_FurMap, sampler_FurMap, input.uv / _BaseMap_ST.xy * _FurScale);
     float alpha = furColor.r * (1.0 - input.layer);
     if (input.layer > 0.0 && alpha < _AlphaCutout) discard;
+
+#ifdef LOD_FADE_CROSSFADE
+    LODFadeCrossFade(input.vertex);
+#endif
 
     return 0;
 }

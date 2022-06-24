@@ -6,8 +6,8 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Shadows.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
+// Main Light Direction.
 float3 _LightDirection;
-float _ShadowExtraBias;
 
 inline float3 GetViewDirectionOS(float3 posOS)
 {
@@ -37,17 +37,18 @@ inline float4 GetShadowPositionHClip(float3 positionWS, float3 normalWS)
     return positionCS;
 }
 
-float _RimLightPower;
-float _RimLightIntensity;
-
-void ApplyRimLight(inout float3 color, float3 posWS, float3 viewDirWS, float3 normalWS)
+void ApplyRimLight(inout float3 color, float3 posWS, float3 viewDirWS, float3 normalWS, InputData inputData = (InputData)0)
 {
     float viewDotNormal = abs(dot(viewDirWS, normalWS));
     float normalFactor = pow(abs(1.0 - viewDotNormal), _RimLightPower);
 
-    Light light = GetMainLight();
-#ifdef _LIGHT_LAYERS
+    Light light = GetMainLight(inputData.shadowCoord, inputData.positionWS, inputData.shadowMask);
+#if defined (_LIGHT_LAYERS)
+    #if (UNITY_VERSION >= 202220)
+    uint meshRenderingLayers = GetMeshRenderingLayer();
+    #else
     uint meshRenderingLayers = GetMeshRenderingLightLayer();
+    #endif
     if (IsMatchingLightLayer(light.layerMask, meshRenderingLayers))
 #endif
     {
@@ -63,12 +64,12 @@ void ApplyRimLight(inout float3 color, float3 posWS, float3 viewDirWS, float3 no
 
 #ifdef _ADDITIONAL_LIGHTS
     int additionalLightsCount = GetAdditionalLightsCount();
-    for (int i = 0; i < additionalLightsCount; ++i)
+
+#if USE_FORWARD_PLUS // Forward+ rendering path.
+    for (uint lightIndex = 0; lightIndex < min(_AdditionalLightsDirectionalCount, MAX_VISIBLE_LIGHTS); lightIndex++)
     {
-        int index = GetPerObjectLightIndex(i);
-        Light light = GetAdditionalPerObjectLight(index, posWS);
-#ifdef _LIGHT_LAYERS
-        uint meshRenderingLayers = GetMeshRenderingLightLayer();
+        Light light = GetAdditionalLight(lightIndex, posWS);
+#if defined (_LIGHT_LAYERS)
         if (IsMatchingLightLayer(light.layerMask, meshRenderingLayers))
 #endif
         {
@@ -76,24 +77,68 @@ void ApplyRimLight(inout float3 color, float3 posWS, float3 viewDirWS, float3 no
             float intensity = max(-lightDirDotView, 0.0);
             intensity *= _RimLightIntensity * normalFactor;
             intensity *= light.distanceAttenuation;
-#ifdef _MAIN_LIGHT_SHADOWS
+#ifdef _ADDITIONAL_LIGHT_SHADOWS
+            intensity *= AdditionalLightRealtimeShadow(lightIndex, posWS);
+#endif
+            color += intensity * light.color;
+        }
+    }
+
+    LIGHT_LOOP_BEGIN(pixelLightCount)
+        Light light = GetAdditionalLight(lightIndex, posWS);
+
+#if defined (_LIGHT_LAYERS)
+    if (IsMatchingLightLayer(light.layerMask, meshRenderingLayers))
+#endif
+    {
+        float lightDirDotView = dot(light.direction, viewDirWS);
+        float intensity = max(-lightDirDotView, 0.0);
+        intensity *= _RimLightIntensity * normalFactor;
+        intensity *= light.distanceAttenuation;
+#ifdef _ADDITIONAL_LIGHT_SHADOWS
+        intensity *= AdditionalLightRealtimeShadow(lightIndex, posWS);
+#endif
+        color += intensity * light.color;
+    }
+    LIGHT_LOOP_END
+
+#else // Forward rendering path.
+
+    for (int i = 0; i < additionalLightsCount; ++i)
+    {
+        int index = GetPerObjectLightIndex(i);
+        Light light = GetAdditionalPerObjectLight(index, posWS);
+#if defined (_LIGHT_LAYERS)
+        if (IsMatchingLightLayer(light.layerMask, meshRenderingLayers))
+#endif
+        {
+            float lightDirDotView = dot(light.direction, viewDirWS);
+            float intensity = max(-lightDirDotView, 0.0);
+            intensity *= _RimLightIntensity * normalFactor;
+            intensity *= light.distanceAttenuation;
+#ifdef _ADDITIONAL_LIGHT_SHADOWS
             intensity *= AdditionalLightRealtimeShadow(index, posWS);
-#endif 
+#endif
             color += intensity * light.color;
         }
     }
 #endif
+#endif
 }
 
-void ApplyRimLightDeferred(inout float3 color, float3 posWS, float3 viewDirWS, float3 normalWS)
+void ApplyRimLightDeferred(inout float3 color, float3 posWS, float3 viewDirWS, float3 normalWS, InputData inputData = (InputData)0)
 {
     float viewDotNormal = abs(dot(viewDirWS, normalWS));
     float normalFactor = pow(abs(1.0 - viewDotNormal), _RimLightPower);
 
-    Light light = GetMainLight();
-#ifdef _LIGHT_LAYERS
-    uint meshRenderingLayer = GetMeshRenderingLightLayer();
-    if (IsMatchingLightLayer(light.layerMask, meshRenderingLayer))
+    Light light = GetMainLight(inputData.shadowCoord, inputData.positionWS, inputData.shadowMask);
+#if defined (_LIGHT_LAYERS)
+    #if (UNITY_VERSION >= 202220)
+    uint meshRenderingLayers = GetMeshRenderingLayer();
+    #else
+    uint meshRenderingLayers = GetMeshRenderingLightLayer();
+    #endif
+    if (IsMatchingLightLayer(light.layerMask, meshRenderingLayers))
 #endif
     {
         float lightDirDotView = dot(light.direction, viewDirWS);
@@ -106,22 +151,22 @@ void ApplyRimLightDeferred(inout float3 color, float3 posWS, float3 viewDirWS, f
         color += intensity * light.color;
     }
 
-#ifdef _ADDITIONAL_LIGHTS
+#if defined (_ADDITIONAL_LIGHTS)
     int additionalLightsCount = GetAdditionalLightsCount();
     for (int i = 0; i < additionalLightsCount; ++i)
     {
         int index = GetPerObjectLightIndex(i);
         Light light = GetAdditionalPerObjectLight(index, posWS);
-#ifdef _LIGHT_LAYERS
-        uint meshRenderingLayer = GetMeshRenderingLightLayer();
-        if (IsMatchingLightLayer(light.layerMask, meshRenderingLayer))
+#if defined (_LIGHT_LAYERS)
+        
+        if (IsMatchingLightLayer(light.layerMask, meshRenderingLayers))
 #endif
         {
             float lightDirDotView = dot(light.direction, viewDirWS);
             float intensity = max(-lightDirDotView, 0.0);
             intensity *= _RimLightIntensity * normalFactor;
             intensity *= light.distanceAttenuation;
-#ifdef _MAIN_LIGHT_SHADOWS
+#ifdef _ADDITIONAL_LIGHT_SHADOWS
             intensity *= AdditionalLightRealtimeShadow(index, posWS);
 #endif 
             color += intensity * light.color;

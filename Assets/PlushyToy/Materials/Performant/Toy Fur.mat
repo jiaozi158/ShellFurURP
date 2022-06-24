@@ -116,6 +116,7 @@ Material:
     m_Floats:
     - _AlphaClip: 0
     - _AlphaCutout: 0.23
+    - _AlphaToCoverageOn: 1
     - _Area: 0.1
     - _Backlit: 0.25
     - _BentType: 1
@@ -132,6 +133,8 @@ Material:
     - _DstBlendAlpha: 0
     - _EnvironmentReflections: 1
     - _FurLengthIntensity: 0.66
+    - _FurRimLighting: 0
+    - _FurRimLightingDeferred: 0
     - _FurScale: 2.1
     - _FurSmoothness: 0.4
     - _FurSpecular: 1

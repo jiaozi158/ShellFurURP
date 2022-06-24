@@ -1,7 +1,6 @@
 #ifndef FUR_SHELL_LIT_HLSL
 #define FUR_SHELL_LIT_HLSL
 
-#include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SurfaceInput.hlsl"
 #include "./Param.hlsl"
 #include "./Common.hlsl"
@@ -10,6 +9,9 @@
 #endif
 // VR single pass instance compability:
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+#if defined(LOD_FADE_CROSSFADE)
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/LODCrossFade.hlsl"
+#endif
 
 struct Attributes
 {
@@ -100,7 +102,7 @@ void AppendShellVertex(inout TriangleStream<g2f> stream, v2g input, int index)
     VertexPositionInputs vertexInput = GetVertexPositionInputs(input.positionOS.xyz);
 
     float clampedShellAmount = clamp(_ShellAmount, 1, 13);
-    _ShellStep = _TotalShellStep / clampedShellAmount;
+    float shellStep = _TotalShellStep / clampedShellAmount;
 
     float moveFactor = pow(abs((float)index / clampedShellAmount), _BaseMove.w);
     float3 posOS = input.positionOS.xyz;
@@ -118,7 +120,7 @@ void AppendShellVertex(inout TriangleStream<g2f> stream, v2g input, int index)
     float3 shellDir = SafeNormalize(groomWS + move + windMove);
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     
-    output.positionWS = vertexInput.positionWS + shellDir * (_ShellStep * index * input.furLength * _FurLengthIntensity);
+    output.positionWS = vertexInput.positionWS + shellDir * (shellStep * index * input.furLength * _FurLengthIntensity);
     output.positionCS = TransformWorldToHClip(output.positionWS);
     output.uv = TRANSFORM_TEX(input.texcoord, _BaseMap);
     output.normalWS = input.normalWS;
@@ -132,6 +134,7 @@ void AppendShellVertex(inout TriangleStream<g2f> stream, v2g input, int index)
 
     OUTPUT_LIGHTMAP_UV(input.staticLightmapUV, unity_LightmapST, output.staticLightmapUV);
 #ifdef DYNAMICLIGHTMAP_ON
+    // No need to consider scale and offset here, they are calculated in vertex shader.
     output.dynamicLightmapUV = input.dynamicLightmapUV;
 #endif
     OUTPUT_SH(output.normalWS.xyz, output.vertexSH);
@@ -153,7 +156,7 @@ void AppendShellVertexInstancing(inout TriangleStream<g2f> stream, v2g input, in
 
     VertexPositionInputs vertexInput = GetVertexPositionInputs(input.positionOS.xyz);
 
-    _ShellStep = _TotalShellStep / _ShellAmount;
+    float shellStep = _TotalShellStep / _ShellAmount;
 
     float moveFactor = pow(abs((float)index / _ShellAmount), _BaseMove.w);
     float3 posOS = input.positionOS.xyz;
@@ -171,7 +174,7 @@ void AppendShellVertexInstancing(inout TriangleStream<g2f> stream, v2g input, in
     float3 shellDir = SafeNormalize(groomWS + move + windMove);
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    output.positionWS = vertexInput.positionWS + shellDir * (_ShellStep * index * input.furLength * _FurLengthIntensity);
+    output.positionWS = vertexInput.positionWS + shellDir * (shellStep * index * input.furLength * _FurLengthIntensity);
     output.positionCS = TransformWorldToHClip(output.positionWS);
     output.uv = TRANSFORM_TEX(input.texcoord, _BaseMap);
     output.normalWS = input.normalWS;
@@ -185,6 +188,7 @@ void AppendShellVertexInstancing(inout TriangleStream<g2f> stream, v2g input, in
 
     OUTPUT_LIGHTMAP_UV(input.staticLightmapUV, unity_LightmapST, output.staticLightmapUV);
 #ifdef DYNAMICLIGHTMAP_ON
+    // No need to consider scale and offset here, they are calculated in vertex shader.
     output.dynamicLightmapUV = input.dynamicLightmapUV;
 #endif
     OUTPUT_SH(output.normalWS.xyz, output.vertexSH);
@@ -247,12 +251,27 @@ void geom(triangle v2g input[3], inout TriangleStream<g2f> stream)
 #endif
 //-----------------------------------(above) For Microsoft Shader Model < 4.1-----------------------------------
 
-half4 frag(g2f input) : SV_Target
+void frag(g2f input
+    , out half4 outColor : SV_Target0
+#ifdef _WRITE_RENDERING_LAYERS
+    , out float4 outRenderingLayers : SV_Target1
+#endif
+)
 {
     float2 furUv = input.uv / _BaseMap_ST.xy * _FurScale;
     float4 furColor = SAMPLE_TEXTURE2D(_FurMap, sampler_FurMap, furUv);
     float alpha = furColor.r * (1.0 - input.layer);
+
+#ifdef _ALPHATEST_ON // MSAA Alpha-To-Coverage Mask
+    alpha = (alpha < _AlphaCutout) ? 0.0 : alpha;
+    half alphaToCoverageAlpha = SharpenAlpha(alpha, _AlphaCutout);
+    bool IsAlphaToMaskAvailable = (_AlphaToMaskAvailable != 0.0);
+    alpha = IsAlphaToMaskAvailable ? alphaToCoverageAlpha : alpha;
+
+    if (input.layer > 0.0 && alpha <= 0.0) discard;
+#else
     if (input.layer > 0.0 && alpha < _AlphaCutout) discard;
+#endif
 
     float3 viewDirWS = SafeNormalize(GetCameraPositionWS() - input.positionWS);
     float3 normalTS = UnpackNormalScale(
@@ -265,20 +284,36 @@ half4 frag(g2f input) : SV_Target
         float3x3(input.tangentWS, bitangent, input.normalWS)));
 
     SurfaceData surfaceData = (SurfaceData)0;
-    InitializeStandardLitSurfaceData(input.uv, surfaceData);
-    half AO = (1.0-SAMPLE_TEXTURE2D(_AOMap, sampler_AOMap, input.uv / _BaseMap_ST.xy).x)* _Occlusion;
-    surfaceData.occlusion = (1.0 - AO) * lerp(1.0 - _Occlusion* _Occlusion, 1.0, input.layer);
+
+    // Avoid using it to support SRP Batching.
+    //InitializeStandardLitSurfaceData(input.uv, surfaceData);
+
+    half4 albedoAlpha = SampleAlbedoAlpha(input.uv, TEXTURE2D_ARGS(_BaseMap, sampler_BaseMap));
+    surfaceData.albedo = albedoAlpha.rgb * _BaseColor.rgb;
+    surfaceData.alpha = 1.0;
+    surfaceData.metallic = _Metallic;
+    surfaceData.smoothness = _Smoothness;
+
+    half AO = (1.0 - SAMPLE_TEXTURE2D(_AOMap, sampler_AOMap, input.uv / _BaseMap_ST.xy).x) * _Occlusion;
+    surfaceData.occlusion = (1.0 - AO) * lerp(1.0 - _Occlusion * _Occlusion, 1.0, input.layer);
+
+#ifdef LOD_FADE_CROSSFADE
+    LODFadeCrossFade(input.positionCS);
+#endif
 
     InputData inputData = (InputData)0;
     inputData.positionWS = input.positionWS;
     inputData.normalWS = normalWS;
     inputData.viewDirectionWS = viewDirWS;
-#if defined(_MAIN_LIGHT_SHADOWS) || defined(_MAIN_LIGHT_SHADOWS_CASCADE) || defined(_MAIN_LIGHT_SHADOWS_SCREEN) && !defined(_RECEIVE_SHADOWS_OFF)
+
+//#if defined(_MAIN_LIGHT_SHADOWS) || defined(_MAIN_LIGHT_SHADOWS_CASCADE) || defined(_MAIN_LIGHT_SHADOWS_SCREEN) && !defined(_RECEIVE_SHADOWS_OFF)
+#if defined(MAIN_LIGHT_CALCULATE_SHADOWS)
     inputData.shadowCoord = TransformWorldToShadowCoord(input.positionWS);
 #else
     inputData.shadowCoord = half4(0, 0, 0, 0);
 #endif
-    inputData.fogCoord = input.fogFactor;
+
+    inputData.fogCoord = InitializeInputDataFog(float4(input.positionWS, 1.0), input.fogFactor);
 
 #ifdef _ADDITIONAL_LIGHTS_VERTEX
     // Vertex Lighting will not be supported as it is not fast enough when calculating so many vertices (in geometry shader).
@@ -307,7 +342,7 @@ half4 frag(g2f input) : SV_Target
 #if defined(_FUR_SPECULAR) && !defined(DEBUG_DISPLAY)
     // Use abs(f) to avoid warning messages that f should not be negative in pow(f, e).
     SurfaceOutputFur s = (SurfaceOutputFur)0;
-    s.Albedo = abs(surfaceData.albedo * _BaseColor.rgb);
+    s.Albedo = abs(surfaceData.albedo);
     s.MedulaScatter = abs(_MedulaScatter);
     s.MedulaAbsorb = abs(1.0 - _MedulaAbsorb);
     // Convert smoothness to roughness, (1 - smoothness) is perceptual roughness.
@@ -315,9 +350,16 @@ half4 frag(g2f input) : SV_Target
     s.Layer = input.layer;
     s.Kappa = (1.0 - _Kappa / 2.0);
 
-    Light mainLight = GetMainLight();
+    half4 shadowMask = CalculateShadowMask(inputData);
+    AmbientOcclusionFactor aoFactor = CreateAmbientOcclusionFactor(inputData, surfaceData);
+
+    Light mainLight = GetMainLight(inputData, shadowMask, aoFactor);
+#if defined (_LIGHT_LAYERS)
+    #if (UNITY_VERSION >= 202220)
+    uint meshRenderingLayers = GetMeshRenderingLayer();
+    #else
     uint meshRenderingLayers = GetMeshRenderingLightLayer();
-#ifdef _LIGHT_LAYERS
+    #endif
     if (IsMatchingLightLayer(mainLight.layerMask, meshRenderingLayers))
 #endif
     {
@@ -330,11 +372,12 @@ half4 frag(g2f input) : SV_Target
 
     // Calculate additional lights.
 #ifdef _ADDITIONAL_LIGHTS
-    int additionalLightsCount = GetAdditionalLightsCount();
-    for (int i = 0; i < additionalLightsCount; ++i)
+
+#if USE_FORWARD_PLUS // Forward+ rendering path.
+    for (uint lightIndex = 0; lightIndex < min(_AdditionalLightsDirectionalCount, MAX_VISIBLE_LIGHTS); lightIndex++)
     {
-        int index = GetPerObjectLightIndex(i);
-        Light light = GetAdditionalPerObjectLight(index, input.positionWS);
+        Light light = GetAdditionalLight(lightIndex, inputData, shadowMask, aoFactor);
+
 #ifdef _LIGHT_LAYERS
         if (IsMatchingLightLayer(light.layerMask, meshRenderingLayers))
 #endif
@@ -345,18 +388,55 @@ half4 frag(g2f input) : SV_Target
             color.rgb += (lightColor * FurBSDFYan(s, light.direction, viewDirWS, normalWS, 1.0, _Backlit, _Area));
         }
     }
+
+    LIGHT_LOOP_BEGIN(pixelLightCount)
+        Light light = GetAdditionalLight(lightIndex, inputData, shadowMask, aoFactor);
+
+#ifdef _LIGHT_LAYERS
+    if (IsMatchingLightLayer(light.layerMask, meshRenderingLayers))
+#endif
+    {
+        half3 lightColor = light.color.rgb * light.distanceAttenuation;
+        // "Screen" blend mode.
+        lightColor = (1 - (1 - s.Albedo) * (1 - lightColor));
+        color.rgb += (lightColor * FurBSDFYan(s, light.direction, viewDirWS, normalWS, 1.0, _Backlit, _Area));
+    }
+    LIGHT_LOOP_END
+#else // Forward rendering path.
+
+    int additionalLightsCount = GetAdditionalLightsCount();
+    for (int i = 0; i < additionalLightsCount; ++i)
+    {
+        int index = GetPerObjectLightIndex(i);
+        //Light light = GetAdditionalPerObjectLight(index, input.positionWS);
+        Light light = GetAdditionalLight(index, inputData, shadowMask, aoFactor);
+#if defined (_LIGHT_LAYERS) && (_WRITE_RENDERING_LAYERS)
+        if (IsMatchingLightLayer(light.layerMask, meshRenderingLayers))
+#endif
+        {
+            half3 lightColor = light.color.rgb * light.distanceAttenuation;
+            // "Screen" blend mode.
+            lightColor = (1 - (1 - s.Albedo) * (1 - lightColor));
+            color.rgb += (lightColor * FurBSDFYan(s, light.direction, viewDirWS, normalWS, 1.0, _Backlit, _Area));
+        }
+    }
+#endif
 #endif
 
     color.rgb = -min(-color.rgb, half3(0.0, 0.0, 0.0));
 #endif
 
-#if !defined(DEBUG_DISPLAY)
-    ApplyRimLight(color.rgb, input.positionWS, viewDirWS, normalWS);
+#if !defined(DEBUG_DISPLAY) && defined(_FUR_RIM_LIGHTING)
+    ApplyRimLight(color.rgb, input.positionWS, viewDirWS, normalWS, inputData);
 #endif
 
     color.rgb = MixFog(color.rgb, inputData.fogCoord);
 
-    return color;
+    outColor = color;
+#ifdef _WRITE_RENDERING_LAYERS
+    uint renderingLayers = GetMeshRenderingLayer();
+    outRenderingLayers = float4(EncodeMeshRenderingLayer(renderingLayers), 0, 0, 0);
+#endif
 }
 
 #endif
