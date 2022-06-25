@@ -99,6 +99,7 @@ SubShader
 #endif
 
 #if (UNITY_VERSION >= 202220)
+        // "_ALPHATEST_ON": MSAA Alpha-To-Coverage is only avaliable on URP 14 or above.
         #pragma shader_feature_local_fragment _ _ALPHATEST_ON
         #pragma multi_compile_fragment _ LOD_FADE_CROSSFADE
         #pragma multi_compile _ _FORWARD_PLUS
@@ -125,7 +126,6 @@ SubShader
         #pragma multi_compile _ DOTS_INSTANCING_ON
         #pragma multi_compile_fragment _ DEBUG_DISPLAY
 
-        //#pragma prefer_hlslcc gles
         #pragma exclude_renderers gles
         // if "_GEOM_INSTANCING", then Microsoft ShaderModel 4.1 (geometry shader instancing support)
         // It is "target 4.6" in Unity. (Tested on OpenGL 4.1, instancing not supported on OpenGL 4.0)
@@ -148,8 +148,10 @@ SubShader
 
         HLSLPROGRAM
         #pragma multi_compile _ _GEOM_INSTANCING
+
 #if (UNITY_VERSION >= 202220)
         #pragma shader_feature_local_fragment _ _ALPHATEST_ON
+        #pragma multi_compile_fragment _ LOD_FADE_CROSSFADE
 #endif
 
         #pragma exclude_renderers gles
@@ -171,8 +173,10 @@ SubShader
 
         HLSLPROGRAM
         #pragma multi_compile _ _GEOM_INSTANCING
+
 #if (UNITY_VERSION >= 202220)
         #pragma shader_feature_local_fragment _ _ALPHATEST_ON
+        #pragma multi_compile_fragment _ LOD_FADE_CROSSFADE
 #endif
 
         #pragma exclude_renderers gles
@@ -197,8 +201,10 @@ SubShader
         HLSLPROGRAM
         #pragma multi_compile _ _GEOM_INSTANCING
         #pragma multi_compile _ _NO_FUR_SHADOW
+
 #if (UNITY_VERSION >= 202220)
         #pragma shader_feature_local_fragment _ _ALPHATEST_ON
+        #pragma multi_compile_fragment _ LOD_FADE_CROSSFADE
 #endif
 
         #pragma exclude_renderers gles
@@ -225,8 +231,10 @@ SubShader
         #pragma multi_compile_fragment _ _GBUFFER_NORMALS_OCT
         #pragma multi_compile_fragment _ _DBUFFER_MRT1 _DBUFFER_MRT2 _DBUFFER_MRT3
         #pragma multi_compile_fragment _ _RENDER_PASS_ENABLED
+
 #if (UNITY_VERSION >= 202220)
         #pragma multi_compile_fragment _ _WRITE_RENDERING_LAYERS
+        #pragma multi_compile_fragment _ LOD_FADE_CROSSFADE
 #endif
 
         #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
@@ -250,7 +258,6 @@ SubShader
         #pragma multi_compile_instancing
         #pragma multi_compile _ DOTS_INSTANCING_ON
 
-        //#pragma prefer_hlslcc gles
         #pragma exclude_renderers gles
         // if "_GEOM_INSTANCING", then Microsoft ShaderModel 4.1 (geometry shader instancing support)
         // It is "target 4.6" in Unity. (Tested on OpenGL 4.1, instancing not supported on OpenGL 4.0)
@@ -310,6 +317,7 @@ SubShader
 #endif
 
 #if (UNITY_VERSION >= 202220)
+        // "_ALPHATEST_ON": MSAA Alpha-To-Coverage is only avaliable on URP 14 or above.
         #pragma shader_feature_local_fragment _ _ALPHATEST_ON
         #pragma multi_compile_fragment _ LOD_FADE_CROSSFADE
         #pragma multi_compile _ _FORWARD_PLUS
@@ -354,8 +362,10 @@ SubShader
 
         HLSLPROGRAM
         #pragma multi_compile _ _GEOM_INSTANCING
+
 #if (UNITY_VERSION >= 202220)
         #pragma shader_feature_local_fragment _ _ALPHATEST_ON
+        #pragma multi_compile_fragment _ LOD_FADE_CROSSFADE
 #endif
 
         #pragma exclude_renderers gles
@@ -376,8 +386,10 @@ SubShader
 
         HLSLPROGRAM
         #pragma multi_compile _ _GEOM_INSTANCING
+
 #if (UNITY_VERSION >= 202220)
         #pragma shader_feature_local_fragment _ _ALPHATEST_ON
+        #pragma multi_compile_fragment _ LOD_FADE_CROSSFADE
 #endif
 
         #pragma exclude_renderers gles
@@ -400,8 +412,10 @@ SubShader
 
         HLSLPROGRAM
         #pragma multi_compile _ _NO_FUR_SHADOW
+
 #if (UNITY_VERSION >= 202220)
         #pragma shader_feature_local_fragment _ _ALPHATEST_ON
+        #pragma multi_compile_fragment _ LOD_FADE_CROSSFADE
 #endif
 
         #pragma exclude_renderers gles
@@ -427,8 +441,10 @@ SubShader
         #pragma multi_compile_fragment _ _GBUFFER_NORMALS_OCT
         #pragma multi_compile_fragment _ _DBUFFER_MRT1 _DBUFFER_MRT2 _DBUFFER_MRT3
         #pragma multi_compile_fragment _ _RENDER_PASS_ENABLED
+
 #if (UNITY_VERSION >= 202220)
         #pragma multi_compile_fragment _ _WRITE_RENDERING_LAYERS
+        #pragma multi_compile_fragment _ LOD_FADE_CROSSFADE
 #endif
 
         #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS

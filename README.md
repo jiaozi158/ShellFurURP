@@ -32,7 +32,9 @@ Screenshots
  
  ![BakedLighting1](https://github.com/jiaozi158/ShellFurURP/blob/main/Documentation/Images/Demo/BakedLighting/BakedLighting1_new.jpg)
 
-all with SSAA X16 enabled. (current URP does not have effective AA method.)
+all with SSAA X16 enabled. ~~(current URP does not have effective AA method.)~~
+
+ **Note:** Anti-aliasing has improved a lot on URP 14. (MSAA Alpha-To-Coverage, TAA)
 
 Documentation
 ------------
