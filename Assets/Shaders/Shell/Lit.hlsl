@@ -34,8 +34,8 @@ struct v2g
 #ifdef DYNAMICLIGHTMAP_ON
     float2  dynamicLightmapUV : TEXCOORD2;
 #endif
-    float3 groomWS : TEXCOORD3;
-    float furLength : TEXCOORD4;
+    half3 groomWS : TEXCOORD3;
+    half furLength : TEXCOORD4;
     UNITY_VERTEX_INPUT_INSTANCE_ID
 };
 
@@ -43,11 +43,11 @@ struct g2f
 {
     float4 positionCS : SV_POSITION;
     float3 positionWS : TEXCOORD0;
-    float3 normalWS : TEXCOORD1;
-    float3 tangentWS : TEXCOORD2;
+    half3 normalWS : TEXCOORD1;
+    half3 tangentWS : TEXCOORD2;
     float2 uv : TEXCOORD4;
     DECLARE_LIGHTMAP_OR_SH(staticLightmapUV, vertexSH, 5);
-    float fogFactor : TEXCOORD6;
+    half fogFactor : TEXCOORD6;
     float  layer : TEXCOORD7;
 #ifdef DYNAMICLIGHTMAP_ON
     float2  dynamicLightmapUV : TEXCOORD8;
@@ -70,11 +70,11 @@ v2g vert(Attributes input)
     VertexNormalInputs normalInput = GetVertexNormalInputs(input.normalOS, input.tangentOS);
 
     // Fur Direction and Length (reusable data for geometry shader)
-    float3 groomTS = SafeNormalize(UnpackNormal(SAMPLE_TEXTURE2D_LOD(_FurDirMap, sampler_FurDirMap, input.texcoord / _BaseMap_ST.xy, 0).xyzw));
+    half3 groomTS = SafeNormalize(UnpackNormal(SAMPLE_TEXTURE2D_LOD(_FurDirMap, sampler_FurDirMap, input.texcoord / _BaseMap_ST.xy, 0).xyzw));
 
     output.groomWS = SafeNormalize(TransformTangentToWorld(
         groomTS,
-        float3x3(normalInput.tangentWS, normalInput.bitangentWS, normalInput.normalWS)));
+        half3x3(normalInput.tangentWS, normalInput.bitangentWS, normalInput.normalWS)));
 
     output.furLength = SAMPLE_TEXTURE2D_LOD(_FurLengthMap, sampler_FurLengthMap, input.texcoord / _BaseMap_ST.xy, 0).x;
 
@@ -101,23 +101,24 @@ void AppendShellVertex(inout TriangleStream<g2f> stream, v2g input, int index)
 
     VertexPositionInputs vertexInput = GetVertexPositionInputs(input.positionOS.xyz);
 
-    float clampedShellAmount = clamp(_ShellAmount, 1, 13);
-    float shellStep = _TotalShellStep / clampedShellAmount;
+    // Low precision should be enough here as we have at most 13 shells.
+    half clampedShellAmount = clamp(_ShellAmount, 1, 13);
+    half shellStep = _TotalShellStep / clampedShellAmount;
 
-    float moveFactor = pow(abs((float)index / clampedShellAmount), _BaseMove.w);
+    half moveFactor = pow(abs((half)index / clampedShellAmount), _BaseMove.w);
     float3 posOS = input.positionOS.xyz;
-    float3 windAngle = _Time.w * _WindFreq.xyz;
-    float3 windMove = moveFactor * _WindMove.xyz * sin(windAngle + posOS * _WindMove.w);
-    float3 move = moveFactor * _BaseMove.xyz;
+    half3 windAngle = _Time.w * _WindFreq.xyz;
+    half3 windMove = moveFactor * _WindMove.xyz * sin(windAngle + posOS * _WindMove.w);
+    half3 move = moveFactor * _BaseMove.xyz;
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Fur Direction
-    float layer = (float)index / clampedShellAmount;
+    half layer = (half)index / clampedShellAmount;
 
-    float bent = _BentType * layer + (1 - _BentType);
+    half bent = _BentType * layer + (1 - _BentType);
 
-    float3 groomWS = lerp(input.normalWS, input.groomWS, _GroomingIntensity * bent);
-    float3 shellDir = SafeNormalize(groomWS + move + windMove);
+    half3 groomWS = lerp(input.normalWS, input.groomWS, _GroomingIntensity * bent);
+    half3 shellDir = SafeNormalize(groomWS + move + windMove);
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     
     output.positionWS = vertexInput.positionWS + shellDir * (shellStep * index * input.furLength * _FurLengthIntensity);
@@ -160,8 +161,8 @@ void AppendShellVertexInstancing(inout TriangleStream<g2f> stream, v2g input, in
 
     float moveFactor = pow(abs((float)index / _ShellAmount), _BaseMove.w);
     float3 posOS = input.positionOS.xyz;
-    float3 windAngle = _Time.w * _WindFreq.xyz;
-    float3 windMove = moveFactor * _WindMove.xyz * sin(windAngle + posOS * _WindMove.w);
+    half3 windAngle = _Time.w * _WindFreq.xyz;
+    half3 windMove = moveFactor * _WindMove.xyz * sin(windAngle + posOS * _WindMove.w);
     float3 move = moveFactor * _BaseMove.xyz;
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -259,8 +260,8 @@ void frag(g2f input
 )
 {
     float2 furUv = input.uv / _BaseMap_ST.xy * _FurScale;
-    float4 furColor = SAMPLE_TEXTURE2D(_FurMap, sampler_FurMap, furUv);
-    float alpha = furColor.r * (1.0 - input.layer);
+    half4 furColor = SAMPLE_TEXTURE2D(_FurMap, sampler_FurMap, furUv);
+    half alpha = furColor.r * (1.0 - input.layer);
 
 #ifdef _ALPHATEST_ON // MSAA Alpha-To-Coverage Mask
     alpha = (alpha < _AlphaCutout) ? 0.0 : alpha;
@@ -274,14 +275,14 @@ void frag(g2f input
 #endif
 
     float3 viewDirWS = SafeNormalize(GetCameraPositionWS() - input.positionWS);
-    float3 normalTS = UnpackNormalScale(
+    half3 normalTS = UnpackNormalScale(
         SAMPLE_TEXTURE2D(_NormalMap, sampler_NormalMap, furUv), 
         _NormalScale);
     // 1.0 should be tangentOS.w, not passing it to fragment shader to keep 39 max vertex counts.
-    float3 bitangent = SafeNormalize(1.0 * cross(input.normalWS, input.tangentWS));
-    float3 normalWS = SafeNormalize(TransformTangentToWorld(
+    half3 bitangent = SafeNormalize(1.0 * cross(input.normalWS, input.tangentWS));
+    half3 normalWS = SafeNormalize(TransformTangentToWorld(
         normalTS, 
-        float3x3(input.tangentWS, bitangent, input.normalWS)));
+        half3x3(input.tangentWS, bitangent, input.normalWS)));
 
     SurfaceData surfaceData = (SurfaceData)0;
 
@@ -340,6 +341,8 @@ void frag(g2f input
     half4 color = UniversalFragmentPBR(inputData, surfaceData);
 
 #if defined(_FUR_SPECULAR) && !defined(DEBUG_DISPLAY)
+    half3 specColor = half3(0.0, 0.0, 0.0);
+
     // Use abs(f) to avoid warning messages that f should not be negative in pow(f, e).
     SurfaceOutputFur s = (SurfaceOutputFur)0;
     s.Albedo = abs(surfaceData.albedo);
@@ -347,7 +350,8 @@ void frag(g2f input
     s.MedulaAbsorb = abs(1.0 - _MedulaAbsorb);
     // Convert smoothness to roughness, (1 - smoothness) is perceptual roughness.
     s.Roughness = (1.0 - _FurSmoothness) * (1.0 - _FurSmoothness);
-    s.Layer = input.layer;
+    // Avoid 0 layer.
+    s.Layer = input.layer + 0.001;
     s.Kappa = (1.0 - _Kappa / 2.0);
 
     half4 shadowMask = CalculateShadowMask(inputData);
@@ -366,7 +370,7 @@ void frag(g2f input
         half3 mainLightColor = mainLight.color.rgb * mainLight.distanceAttenuation;
         // "Screen" blend mode.
         mainLightColor = (1 - (1 - s.Albedo) * (1 - mainLightColor));
-        color.rgb += (mainLightColor * FurBSDFYan(s, mainLight.direction, viewDirWS, normalWS, 1.0, _Backlit, _Area));
+        specColor += (mainLightColor * FurBSDFYan(s, mainLight.direction, viewDirWS, normalWS, 1.0, _Backlit, _Area));
 
     }
 
@@ -385,7 +389,7 @@ void frag(g2f input
             half3 lightColor = light.color.rgb * light.distanceAttenuation;
             // "Screen" blend mode.
             lightColor = (1 - (1 - s.Albedo) * (1 - lightColor));
-            color.rgb += (lightColor * FurBSDFYan(s, light.direction, viewDirWS, normalWS, 1.0, _Backlit, _Area));
+            specColor += (lightColor * FurBSDFYan(s, light.direction, viewDirWS, normalWS, 1.0, _Backlit, _Area));
         }
     }
 
@@ -399,7 +403,7 @@ void frag(g2f input
         half3 lightColor = light.color.rgb * light.distanceAttenuation;
         // "Screen" blend mode.
         lightColor = (1 - (1 - s.Albedo) * (1 - lightColor));
-        color.rgb += (lightColor * FurBSDFYan(s, light.direction, viewDirWS, normalWS, 1.0, _Backlit, _Area));
+        specColor += (lightColor * FurBSDFYan(s, light.direction, viewDirWS, normalWS, 1.0, _Backlit, _Area));
     }
     LIGHT_LOOP_END
 #else // Forward rendering path.
@@ -417,13 +421,14 @@ void frag(g2f input
             half3 lightColor = light.color.rgb * light.distanceAttenuation;
             // "Screen" blend mode.
             lightColor = (1 - (1 - s.Albedo) * (1 - lightColor));
-            color.rgb += (lightColor * FurBSDFYan(s, light.direction, viewDirWS, normalWS, 1.0, _Backlit, _Area));
+            specColor += (lightColor * FurBSDFYan(s, light.direction, viewDirWS, normalWS, 1.0, _Backlit, _Area));
         }
     }
 #endif
 #endif
-
-    color.rgb = -min(-color.rgb, half3(0.0, 0.0, 0.0));
+    // [important] Use saturate to avoid NaN, Inf or Negative values.
+    color.rgb += saturate(specColor);
+    //color.rgb += -min(-specColor, half3(0.0, 0.0, 0.0));
 #endif
 
 #if !defined(DEBUG_DISPLAY) && defined(_FUR_RIM_LIGHTING)

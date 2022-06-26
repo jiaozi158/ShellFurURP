@@ -27,8 +27,8 @@ struct v2g
     float3 normalWS : NORMAL;
     float3 tangentWS : TANGENT;
     float2 uv : TEXCOORD0;
-    float3 groomWS : TEXCOORD1;
-    float furLength : TEXCOORD2;
+    half3 groomWS : TEXCOORD1;
+    half furLength : TEXCOORD2;
     UNITY_VERTEX_INPUT_INSTANCE_ID
 };
 
@@ -55,11 +55,11 @@ v2g vert(Attributes input)
     VertexNormalInputs normalInput = GetVertexNormalInputs(input.normalOS, input.tangentOS);
 
     // Fur Direction and Length (reusable data for geometry shader)
-    float3 groomTS = SafeNormalize(UnpackNormal(SAMPLE_TEXTURE2D_LOD(_FurDirMap, sampler_FurDirMap, input.uv / _BaseMap_ST.xy, 0).xyzw));
+    half3 groomTS = SafeNormalize(UnpackNormal(SAMPLE_TEXTURE2D_LOD(_FurDirMap, sampler_FurDirMap, input.uv / _BaseMap_ST.xy, 0).xyzw));
 
     output.groomWS = SafeNormalize(TransformTangentToWorld(
         groomTS,
-        float3x3(normalInput.tangentWS, normalInput.bitangentWS, normalInput.normalWS)));
+        half3x3(normalInput.tangentWS, normalInput.bitangentWS, normalInput.normalWS)));
 
     output.furLength = SAMPLE_TEXTURE2D_LOD(_FurLengthMap, sampler_FurLengthMap, input.uv / _BaseMap_ST.xy, 0).x;
 
@@ -82,30 +82,29 @@ void AppendShellVertex(inout TriangleStream<g2f> stream, v2g input, int index)
 
     VertexPositionInputs vertexInput = GetVertexPositionInputs(input.positionOS.xyz);
 
-    float clampedShellAmount = clamp(_ShellAmount, 1, 13);
-    float shellStep = _TotalShellStep / clampedShellAmount;
+    // Low precision should be enough here as we have at most 13 shells.
+    half clampedShellAmount = clamp(_ShellAmount, 1, 13);
+    half shellStep = _TotalShellStep / clampedShellAmount;
 
-    float moveFactor = pow(abs((float)index / clamp(_ShellAmount, 1, 13)), _BaseMove.w);
+    half moveFactor = pow(abs((half)index / clamp(_ShellAmount, 1, 13)), _BaseMove.w);
     float3 posOS = input.positionOS.xyz;
-    float3 windAngle = _Time.w * _WindFreq.xyz;
-    float3 windMove = moveFactor * _WindMove.xyz * sin(windAngle + posOS * _WindMove.w);
-    float3 move = moveFactor * _BaseMove.xyz;
+    half3 windAngle = _Time.w * _WindFreq.xyz;
+    half3 windMove = moveFactor * _WindMove.xyz * sin(windAngle + posOS * _WindMove.w);
+    half3 move = moveFactor * _BaseMove.xyz;
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Fur Direction
-    float layer = (float)index / clampedShellAmount;
+    half layer = (half)index / clampedShellAmount;
 
-    float bent = _BentType * layer + (1 - _BentType);
+    half bent = _BentType * layer + (1 - _BentType);
 
-    float3 groomWS = lerp(input.normalWS, input.groomWS, _GroomingIntensity * bent);
-    float3 shellDir = SafeNormalize(groomWS + move + windMove);
+    half3 groomWS = lerp(input.normalWS, input.groomWS, _GroomingIntensity * bent);
+    half3 shellDir = SafeNormalize(groomWS + move + windMove);
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     float3 posWS = vertexInput.positionWS + shellDir * (shellStep * index * input.furLength * _FurLengthIntensity);
-
-    float4 posCS = GetShadowPositionHClip(posWS, input.normalWS);
     
-    output.vertex = posCS;
+    output.vertex = GetShadowPositionHClip(posWS, input.normalWS);
     output.uv = TRANSFORM_TEX(input.uv, _FurMap);
     output.layer = layer;
 
@@ -129,8 +128,8 @@ void AppendShellVertexInstancing(inout TriangleStream<g2f> stream, v2g input, in
 
     float moveFactor = pow(abs((float)index / _ShellAmount), _BaseMove.w);
     float3 posOS = input.positionOS.xyz;
-    float3 windAngle = _Time.w * _WindFreq.xyz;
-    float3 windMove = moveFactor * _WindMove.xyz * sin(windAngle + posOS * _WindMove.w);
+    half3 windAngle = _Time.w * _WindFreq.xyz;
+    half3 windMove = moveFactor * _WindMove.xyz * sin(windAngle + posOS * _WindMove.w);
     float3 move = moveFactor * _BaseMove.xyz;
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -145,9 +144,7 @@ void AppendShellVertexInstancing(inout TriangleStream<g2f> stream, v2g input, in
 
     float3 posWS = vertexInput.positionWS + shellDir * (shellStep * index * input.furLength * _FurLengthIntensity);
 
-    float4 posCS = GetShadowPositionHClip(posWS, input.normalWS);
-
-    output.vertex = posCS;
+    output.vertex = GetShadowPositionHClip(posWS, input.normalWS);
     output.uv = TRANSFORM_TEX(input.uv, _FurMap);
     output.layer = layer;
 
@@ -214,10 +211,10 @@ void geom(triangle v2g input[3], inout TriangleStream<g2f> stream)
 #endif
 //-----------------------------------(above) For Microsoft Shader Model < 4.1-----------------------------------
 
-half4 frag(g2f input) : SV_TARGET
+half4 frag(g2f input) : SV_Target
 {
-    float4 furColor = SAMPLE_TEXTURE2D(_FurMap, sampler_FurMap, input.uv / _BaseMap_ST.xy * _FurScale);
-    float alpha = furColor.r * (1.0 - input.layer);
+    half4 furColor = SAMPLE_TEXTURE2D(_FurMap, sampler_FurMap, input.uv / _BaseMap_ST.xy * _FurScale);
+    half alpha = furColor.r * (1.0 - input.layer);
     if (input.layer > 0.0 && alpha < _AlphaCutout) discard;
 
 #ifdef LOD_FADE_CROSSFADE

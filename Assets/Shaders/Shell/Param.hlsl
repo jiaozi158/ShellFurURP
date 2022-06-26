@@ -9,36 +9,36 @@
 #if (UNITY_VERSION >= 202220)
 CBUFFER_START(UnityPerMaterial)
 #endif
-float4 _BaseColor;
-float _Smoothness;
-float _FurScale;
-float _AlphaCutout;
-float _NormalScale;
-int _ShellAmount;
-float _TotalShellStep;
+half4 _BaseColor;
+half _Smoothness;
+half _FurScale;
+half _AlphaCutout;
+half _NormalScale;
+half _ShellAmount;
+half _TotalShellStep;
 
-float _Occlusion;
-float _FurLengthIntensity;
-float _GroomingIntensity;
+half _Occlusion;
+half _FurLengthIntensity;
+half _GroomingIntensity;
 
-float _BentType;
+half _BentType;
 
-float _FurSmoothness;
-float _Backlit;
-float _Area;
-float _MedulaScatter;
-float _MedulaAbsorb;
-float _Kappa;
+half _FurSmoothness;
+half _Backlit;
+half _Area;
+half _MedulaScatter;
+half _MedulaAbsorb;
+half _Kappa;
 
-float _RimLightPower;
-float _RimLightIntensity;
+half _RimLightPower;
+half _RimLightIntensity;
 
-float _ShadowExtraBias;
+half _ShadowExtraBias;
 
-float _Metallic;
-float4 _BaseMove;
-float4 _WindFreq;
-float4 _WindMove;
+half _Metallic;
+half4 _BaseMove;
+half4 _WindFreq;
+half4 _WindMove;
 
 float4 _BaseMap_ST;
 float4 _FurMap_ST;
