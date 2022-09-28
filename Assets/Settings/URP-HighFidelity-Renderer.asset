@@ -23,6 +23,33 @@ MonoBehaviour:
     DirectLightingStrength: 0.75
     Radius: 0.015
     SampleCount: 5
+--- !u!114 &-1752976145888738883
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b7158e35001bb87408583c41be1938ca, type: 3}
+  m_Name: MultiPassFurDepthNormals
+  m_EditorClassIdentifier: 
+  m_Active: 1
+  settings:
+    passTag: Fur DepthNormals
+    ShellAmount: 52
+    PassEvent: 200
+    filterSettings:
+      LayerMask:
+        serializedVersion: 2
+        m_Bits: 4294967295
+      PassNames:
+      - UniversalForwardFur
+      - DepthOnlyFur
+      - DepthNormalsFur
+      - ShadowCasterFur
+      - UniversalGBufferFur
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -40,7 +67,10 @@ MonoBehaviour:
       type: 3}
   m_RendererFeatures:
   - {fileID: -1878332245247344467}
-  m_RendererFeatureMap: adc0de57c6d2eee5
+  - {fileID: 4015522707559033886}
+  - {fileID: 4682287208208310115}
+  - {fileID: -1752976145888738883}
+  m_RendererFeatureMap: adc0de57c6d2eee51e2c929ba000ba37639f9c7568d3fa40bd8191a47b2dace7
   m_UseNativeRenderPass: 0
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
   xrSystemData: {fileID: 11400000, guid: 60e1133243b97e347b653163a8c01b64, type: 2}
@@ -80,3 +110,57 @@ MonoBehaviour:
   m_ClusteredRendering: 0
   m_TileSize: 32
   m_IntermediateTextureMode: 0
+--- !u!114 &4015522707559033886
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bd3eef993268b5b4c879e85946092a21, type: 3}
+  m_Name: MultiPassFur
+  m_EditorClassIdentifier: 
+  m_Active: 1
+  settings:
+    passTag: Fur ForwardLit
+    ShellAmount: 52
+    PassEvent: 250
+    filterSettings:
+      LayerMask:
+        serializedVersion: 2
+        m_Bits: 4294967295
+      PassNames:
+      - UniversalForwardFur
+      - DepthOnlyFur
+      - DepthNormalsFur
+      - ShadowCasterFur
+      - UniversalGBufferFur
+--- !u!114 &4682287208208310115
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3f745bd9189ecb848a4f37380b35a342, type: 3}
+  m_Name: MultiPassFurDepth
+  m_EditorClassIdentifier: 
+  m_Active: 1
+  settings:
+    passTag: Fur DepthOnly
+    ShellAmount: 52
+    PassEvent: 200
+    filterSettings:
+      LayerMask:
+        serializedVersion: 2
+        m_Bits: 4294967295
+      PassNames:
+      - UniversalForwardFur
+      - DepthOnlyFur
+      - DepthNormalsFur
+      - ShadowCasterFur
+      - UniversalGBufferFur

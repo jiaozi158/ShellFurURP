@@ -14,3 +14,7 @@ Documentation
   - [Fur Length](https://github.com/jiaozi158/ShellFurURP/blob/main/Documentation/FurLength.md)
   
   - [Fur Direction](https://github.com/jiaozi158/ShellFurURP/blob/main/Documentation/FurDirection.md)
+
+- How To Use Multi-Pass Fur
+
+  - Click [here](https://github.com/jiaozi158/ShellFurURP/blob/main/Documentation/Multi-PassFur.md).
