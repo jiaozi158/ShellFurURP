@@ -96,6 +96,10 @@ Material:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _PreIntegratedAverageHairFiberScattering:
+        m_Texture: {fileID: 11700000, guid: 90d7a19df72dfc64fa7d6b18b90cf3c9, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _SpecGlossMap:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
@@ -125,7 +129,9 @@ Material:
     - _BumpScale: 1
     - _ClearCoatMask: 0
     - _ClearCoatSmoothness: 0
+    - _ConsiderShadow: 0
     - _Cull: 2
+    - _CuticleAngle: 3
     - _Cutoff: 0.5
     - _DetailAlbedoMapScale: 1
     - _DetailNormalMapScale: 1
@@ -146,6 +152,7 @@ Material:
     - _GlossyReflections: 0
     - _GroomingIntensity: 1
     - _Kappa: 1
+    - _Material_Type: 0
     - _MedulaAbsorb: 0.9
     - _MedulaScatter: 0.5
     - _Metallic: 0
@@ -155,9 +162,11 @@ Material:
     - _OcclusionStrength: 1
     - _Parallax: 0.005
     - _QueueOffset: 0
+    - _RadialSmoothness: 0.7
     - _ReceiveShadows: 1
     - _RimLightIntensity: 0
     - _RimLightPower: 12
+    - _RootSmoothness: 0.6
     - _ShadowExtraBias: -0.01
     - _ShellAmount: 10
     - _ShellStep: 0.001
@@ -167,6 +176,7 @@ Material:
     - _SrcBlend: 1
     - _SrcBlendAlpha: 1
     - _Surface: 0
+    - _TipSmoothness: 0.8
     - _TotalShellStep: 0.288
     - _WorkflowMode: 1
     - _ZWrite: 1
@@ -176,7 +186,9 @@ Material:
     - _BaseMove: {r: 0, g: -0, b: 0, a: 3}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
+    - _RootColor: {r: 1, g: 1, b: 1, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
+    - _TipColor: {r: 1, g: 1, b: 1, a: 1}
     - _WindFreq: {r: 0, g: 0, b: 0, a: 1}
     - _WindMove: {r: 0, g: 0, b: 0, a: 1}
   m_BuildTextureStacks: []

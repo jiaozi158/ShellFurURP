@@ -39,6 +39,7 @@ MonoBehaviour:
   settings:
     passTag: Fur DepthNormals
     ShellAmount: 52
+    decalMode: 0
     PassEvent: 200
     filterSettings:
       LayerMask:
@@ -153,6 +154,7 @@ MonoBehaviour:
   settings:
     passTag: Fur DepthOnly
     ShellAmount: 52
+    decalMode: 0
     PassEvent: 200
     filterSettings:
       LayerMask:

@@ -7,11 +7,12 @@ ShellFurURP
  
  Based on hecomi's [UnityFurURP](https://github.com/hecomi/UnityFurURP).
  
- Containing four demo scenes:
+ Containing five demo scenes:
  - High Fidelity
  - Performant
  - BakedLighting
  - Multi-Pass Fur
+ - Physical Hair
  
  Please change the Project Quality from "HighFidelity" to "Performant" if opening "Performant" scene.
  
@@ -40,6 +41,14 @@ Screenshots
  The same as High Fidelity/Performant scene.
 
  Click [here](https://github.com/jiaozi158/ShellFurURP/blob/main/Documentation/Multi-PassFur.md) to know more about Multi-Pass Fur.
+
+**(Physical Hair Scene)**
+
+ This scene uses the Physical Hair lighting model from HDRP.
+
+ ![PhysicalHair1](https://github.com/jiaozi158/ShellFurURP/blob/main/Documentation/Images/Demo/PhysicalHair/PhysicalHair1.jpg)
+
+ ![PhysicalHair2](https://github.com/jiaozi158/ShellFurURP/blob/main/Documentation/Images/Demo/PhysicalHair/PhysicalHair2.jpg)
 
 all with SSAA X16 enabled. ~~(current URP does not have effective AA method.)~~
 

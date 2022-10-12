@@ -23,12 +23,20 @@ half _GroomingIntensity;
 
 half _BentType;
 
+half _ConsiderShadow;
 half _FurSmoothness;
 half _Backlit;
 half _Area;
 half _MedulaScatter;
 half _MedulaAbsorb;
 half _Kappa;
+
+half4 _RootColor;
+half4 _TipColor;
+half _RootSmoothness;
+half _TipSmoothness;
+half _CuticleAngle;
+half _RadialSmoothness;
 
 half _RimLightPower;
 half _RimLightIntensity;
@@ -61,4 +69,7 @@ SAMPLER(sampler_FurLengthMap);
 
 TEXTURE2D(_AOMap);
 SAMPLER(sampler_AOMap);
+
+TEXTURE3D(_PreIntegratedAverageHairFiberScattering);
+SAMPLER(s_point_clamp_sampler);
 #endif

@@ -4,13 +4,20 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SurfaceInput.hlsl"
 #include "./Param.hlsl"
 #include "./Common.hlsl"
-#if defined(_FUR_SPECULAR)
+
+#if defined(_FUR_SPECULAR) && !defined(_MATERIAL_TYPE_PHYSICAL_HAIR)
 #include "./FurSpecular.hlsl"
 #endif
+
 // VR single pass instance compability:
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 #if defined(LOD_FADE_CROSSFADE)
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/LODCrossFade.hlsl"
+#endif
+
+#if defined(_MATERIAL_TYPE_PHYSICAL_HAIR)
+#include "./PhysicalHair/MarschnerHairBSDF.hlsl"
+#include "./PhysicalHair/HairMultipleScattering.hlsl"
 #endif
 
 struct Attributes
@@ -18,7 +25,7 @@ struct Attributes
     float4 positionOS : POSITION;
     float3 normalOS : NORMAL;
     float4 tangentOS : TANGENT;
-    float2 texcoord : TEXCOORD0;
+    float2 uv : TEXCOORD0;
     float2 staticLightmapUV : TEXCOORD1;
     float2 dynamicLightmapUV : TEXCOORD2; // Dynamic lightmap UVs
     UNITY_VERTEX_INPUT_INSTANCE_ID
@@ -27,9 +34,9 @@ struct Attributes
 struct v2g
 {
     float4 positionOS : POSITION;
-    float3 normalWS : NORMAL;
-    float3 tangentWS : TANGENT;
-    float2 texcoord : TEXCOORD0;
+    half3 normalWS : NORMAL;
+    half4 tangentWS : TEXCOORD2; // w is tangentOS.w
+    float2 uv : TEXCOORD0;
     float2 staticLightmapUV : TEXCOORD1;
 #ifdef DYNAMICLIGHTMAP_ON
     float2  dynamicLightmapUV : TEXCOORD2;
@@ -44,7 +51,7 @@ struct g2f
     float4 positionCS : SV_POSITION;
     float3 positionWS : TEXCOORD0;
     half3 normalWS : TEXCOORD1;
-    half3 tangentWS : TEXCOORD2;
+    half4 tangentWS : TEXCOORD2; // w is tangentOS.w
     float2 uv : TEXCOORD4;
     DECLARE_LIGHTMAP_OR_SH(staticLightmapUV, vertexSH, 5);
     half fogFactor : TEXCOORD6;
@@ -70,18 +77,18 @@ v2g vert(Attributes input)
     VertexNormalInputs normalInput = GetVertexNormalInputs(input.normalOS, input.tangentOS);
 
     // Fur Direction and Length (reusable data for geometry shader)
-    half3 groomTS = SafeNormalize(UnpackNormal(SAMPLE_TEXTURE2D_LOD(_FurDirMap, sampler_FurDirMap, input.texcoord / _BaseMap_ST.xy, 0).xyzw));
+    half3 groomTS = SafeNormalize(UnpackNormal(SAMPLE_TEXTURE2D_LOD(_FurDirMap, sampler_FurDirMap, input.uv / _BaseMap_ST.xy, 0).xyzw));
 
     output.groomWS = SafeNormalize(TransformTangentToWorld(
         groomTS,
         half3x3(normalInput.tangentWS, normalInput.bitangentWS, normalInput.normalWS)));
 
-    output.furLength = SAMPLE_TEXTURE2D_LOD(_FurLengthMap, sampler_FurLengthMap, input.texcoord / _BaseMap_ST.xy, 0).x;
+    output.furLength = SAMPLE_TEXTURE2D_LOD(_FurLengthMap, sampler_FurLengthMap, input.uv / _BaseMap_ST.xy, 0).x;
 
     output.positionOS = input.positionOS;
     output.normalWS = normalInput.normalWS;
-    output.tangentWS = normalInput.tangentWS;
-    output.texcoord = input.texcoord;
+    output.tangentWS = half4(normalInput.tangentWS, input.tangentOS.w);
+    output.uv = input.uv;
     output.staticLightmapUV = input.staticLightmapUV;
 #ifdef DYNAMICLIGHTMAP_ON
     output.dynamicLightmapUV = input.dynamicLightmapUV.xy * unity_DynamicLightmapST.xy + unity_DynamicLightmapST.zw;
@@ -123,7 +130,7 @@ void AppendShellVertex(inout TriangleStream<g2f> stream, v2g input, int index)
     
     output.positionWS = vertexInput.positionWS + shellDir * (shellStep * index * input.furLength * _FurLengthIntensity);
     output.positionCS = TransformWorldToHClip(output.positionWS);
-    output.uv = TRANSFORM_TEX(input.texcoord, _BaseMap);
+    output.uv = TRANSFORM_TEX(input.uv, _BaseMap);
     output.normalWS = input.normalWS;
     output.tangentWS = input.tangentWS;
     output.layer = layer;
@@ -177,7 +184,7 @@ void AppendShellVertexInstancing(inout TriangleStream<g2f> stream, v2g input, in
 
     output.positionWS = vertexInput.positionWS + shellDir * (shellStep * index * input.furLength * _FurLengthIntensity);
     output.positionCS = TransformWorldToHClip(output.positionWS);
-    output.uv = TRANSFORM_TEX(input.texcoord, _BaseMap);
+    output.uv = TRANSFORM_TEX(input.uv, _BaseMap);
     output.normalWS = input.normalWS;
     output.tangentWS = input.tangentWS;
     output.layer = layer;
@@ -276,13 +283,13 @@ void frag(g2f input
 
     float3 viewDirWS = SafeNormalize(GetCameraPositionWS() - input.positionWS);
     half3 normalTS = UnpackNormalScale(
-        SAMPLE_TEXTURE2D(_NormalMap, sampler_NormalMap, furUv), 
+        SAMPLE_TEXTURE2D(_NormalMap, sampler_NormalMap, furUv),
         _NormalScale);
-    // 1.0 should be tangentOS.w, not passing it to fragment shader to keep 39 max vertex counts.
-    half3 bitangent = SafeNormalize(1.0 * cross(input.normalWS, input.tangentWS));
+
+    half3 bitangent = SafeNormalize(input.tangentWS.w * cross(input.normalWS, input.tangentWS.xyz));
     half3 normalWS = SafeNormalize(TransformTangentToWorld(
-        normalTS, 
-        half3x3(input.tangentWS, bitangent, input.normalWS)));
+        normalTS,
+        half3x3(input.tangentWS.xyz, bitangent, input.normalWS)));
 
     SurfaceData surfaceData = (SurfaceData)0;
 
@@ -290,10 +297,18 @@ void frag(g2f input
     //InitializeStandardLitSurfaceData(input.uv, surfaceData);
 
     half4 albedoAlpha = SampleAlbedoAlpha(input.uv, TEXTURE2D_ARGS(_BaseMap, sampler_BaseMap));
+
+#if defined (_MATERIAL_TYPE_PHYSICAL_HAIR)
+    surfaceData.albedo = albedoAlpha.rgb * lerp(_RootColor.rgb, _TipColor.rgb, input.layer);
+    surfaceData.metallic = 0.0;
+    surfaceData.smoothness = lerp(_RootSmoothness, _TipSmoothness, input.layer);
+#else
     surfaceData.albedo = albedoAlpha.rgb * _BaseColor.rgb;
-    surfaceData.alpha = 1.0;
     surfaceData.metallic = _Metallic;
     surfaceData.smoothness = _Smoothness;
+#endif
+
+    surfaceData.alpha = 1.0;
 
     half AO = (1.0 - SAMPLE_TEXTURE2D(_AOMap, sampler_AOMap, input.uv / _BaseMap_ST.xy).x) * _Occlusion;
     surfaceData.occlusion = (1.0 - AO) * lerp(1.0 - _Occlusion * _Occlusion, 1.0, input.layer);
@@ -307,11 +322,10 @@ void frag(g2f input
     inputData.normalWS = normalWS;
     inputData.viewDirectionWS = viewDirWS;
 
-//#if defined(_MAIN_LIGHT_SHADOWS) || defined(_MAIN_LIGHT_SHADOWS_CASCADE) || defined(_MAIN_LIGHT_SHADOWS_SCREEN) && !defined(_RECEIVE_SHADOWS_OFF)
 #if defined(MAIN_LIGHT_CALCULATE_SHADOWS)
     inputData.shadowCoord = TransformWorldToShadowCoord(input.positionWS);
 #else
-    inputData.shadowCoord = half4(0, 0, 0, 0);
+    inputData.shadowCoord = float4(0, 0, 0, 0);
 #endif
 
     inputData.fogCoord = InitializeInputDataFog(float4(input.positionWS, 1.0), input.fogFactor);
@@ -338,9 +352,11 @@ void frag(g2f input
     ApplyDecalToSurfaceData(input.positionCS, surfaceData, inputData);
 #endif
 
-    half4 color = UniversalFragmentPBR(inputData, surfaceData);
+#if !defined(_MATERIAL_TYPE_PHYSICAL_HAIR)
+    outColor = UniversalFragmentPBR(inputData, surfaceData);
+#endif
 
-#if defined(_FUR_SPECULAR) && !defined(DEBUG_DISPLAY)
+#if defined(_FUR_SPECULAR) && !defined(DEBUG_DISPLAY) && !defined (_MATERIAL_TYPE_PHYSICAL_HAIR)
     half3 specColor = half3(0.0, 0.0, 0.0);
 
     // Use abs(f) to avoid warning messages that f should not be negative in pow(f, e).
@@ -358,18 +374,18 @@ void frag(g2f input
     AmbientOcclusionFactor aoFactor = CreateAmbientOcclusionFactor(inputData, surfaceData);
 
     Light mainLight = GetMainLight(inputData, shadowMask, aoFactor);
+    _ConsiderShadow = _ConsiderShadow == 1 ? 0 : 1; // Remap from 1/0 to 0/1.
+
 #if defined (_LIGHT_LAYERS)
-    #if (UNITY_VERSION >= 202220)
+#if (UNITY_VERSION >= 202220)
     uint meshRenderingLayers = GetMeshRenderingLayer();
-    #else
+#else
     uint meshRenderingLayers = GetMeshRenderingLightLayer();
-    #endif
+#endif
     if (IsMatchingLightLayer(mainLight.layerMask, meshRenderingLayers))
 #endif
     {
-        half3 mainLightColor = mainLight.color.rgb * mainLight.distanceAttenuation;
-        // "Screen" blend mode.
-        mainLightColor = (1 - (1 - s.Albedo) * (1 - mainLightColor));
+        half3 mainLightColor = mainLight.color.rgb * mainLight.distanceAttenuation * saturate(mainLight.shadowAttenuation + _ConsiderShadow);
         specColor += (mainLightColor * FurBSDFYan(s, mainLight.direction, viewDirWS, normalWS, 1.0, _Backlit, _Area));
 
     }
@@ -386,9 +402,7 @@ void frag(g2f input
         if (IsMatchingLightLayer(light.layerMask, meshRenderingLayers))
 #endif
         {
-            half3 lightColor = light.color.rgb * light.distanceAttenuation;
-            // "Screen" blend mode.
-            lightColor = (1 - (1 - s.Albedo) * (1 - lightColor));
+            half3 lightColor = light.color.rgb * light.distanceAttenuation * saturate(light.shadowAttenuation + _ConsiderShadow);
             specColor += (lightColor * FurBSDFYan(s, light.direction, viewDirWS, normalWS, 1.0, _Backlit, _Area));
         }
     }
@@ -400,9 +414,7 @@ void frag(g2f input
     if (IsMatchingLightLayer(light.layerMask, meshRenderingLayers))
 #endif
     {
-        half3 lightColor = light.color.rgb * light.distanceAttenuation;
-        // "Screen" blend mode.
-        lightColor = (1 - (1 - s.Albedo) * (1 - lightColor));
+        half3 lightColor = light.color.rgb * light.distanceAttenuation * saturate(light.shadowAttenuation + _ConsiderShadow);
         specColor += (lightColor * FurBSDFYan(s, light.direction, viewDirWS, normalWS, 1.0, _Backlit, _Area));
     }
     LIGHT_LOOP_END
@@ -414,30 +426,47 @@ void frag(g2f input
         int index = GetPerObjectLightIndex(i);
         //Light light = GetAdditionalPerObjectLight(index, input.positionWS);
         Light light = GetAdditionalLight(index, inputData, shadowMask, aoFactor);
-#if defined (_LIGHT_LAYERS) && (_WRITE_RENDERING_LAYERS)
+#if defined (_LIGHT_LAYERS)
         if (IsMatchingLightLayer(light.layerMask, meshRenderingLayers))
 #endif
         {
-            half3 lightColor = light.color.rgb * light.distanceAttenuation;
-            // "Screen" blend mode.
-            lightColor = (1 - (1 - s.Albedo) * (1 - lightColor));
+            half3 lightColor = light.color.rgb * light.distanceAttenuation * saturate(light.shadowAttenuation + _ConsiderShadow);
             specColor += (lightColor * FurBSDFYan(s, light.direction, viewDirWS, normalWS, 1.0, _Backlit, _Area));
         }
     }
 #endif
 #endif
-    // [important] Use saturate to avoid NaN, Inf or Negative values.
-    color.rgb += saturate(specColor);
-    //color.rgb += -min(-specColor, half3(0.0, 0.0, 0.0));
+    // Suppressing NaN values.
+    outColor.rgb += max(specColor, half3(0.0, 0.0, 0.0));
 #endif
 
-#if !defined(DEBUG_DISPLAY) && defined(_FUR_RIM_LIGHTING)
-    ApplyRimLight(color.rgb, input.positionWS, viewDirWS, normalWS, inputData);
+#if defined (_MATERIAL_TYPE_PHYSICAL_HAIR)
+    MarschnerHairSurfaceData hairSurfaceData = (MarschnerHairSurfaceData)0;
+
+    half3 groomTS = SafeNormalize(UnpackNormal(SAMPLE_TEXTURE2D_LOD(_FurDirMap, sampler_FurDirMap, input.uv / _BaseMap_ST.xy, 0).xyzw));
+
+    // Tangent vector (fur normal considered) for physical hair.
+    half3 groomWS = SafeNormalize(TransformTangentToWorld(
+        groomTS,
+        half3x3(input.tangentWS.xyz, SafeNormalize(input.tangentWS.w * cross(normalWS, input.tangentWS.xyz)), normalWS)));
+
+    // Not used by physical hair.
+    //hairSurfaceData.geomNormalWS = normalWS;
+    hairSurfaceData.hairStrandDirection = groomWS;// normalWS;
+    hairSurfaceData.normalWS = normalWS;
+    hairSurfaceData.cuticleAngle = _CuticleAngle;
+    hairSurfaceData.perceptualRadialSmoothness = _RadialSmoothness;
+
+    outColor = LightingHairFX(hairSurfaceData, surfaceData, inputData);
 #endif
 
-    color.rgb = MixFog(color.rgb, inputData.fogCoord);
+    // Transmission is built into the physical hair lighting model.
+#if !defined(DEBUG_DISPLAY) && defined(_FUR_RIM_LIGHTING) && !defined (_MATERIAL_TYPE_PHYSICAL_HAIR)
+    ApplyRimLight(outColor.rgb, input.positionWS, viewDirWS, normalWS, inputData);
+#endif
 
-    outColor = color;
+    outColor.rgb = MixFog(outColor.rgb, inputData.fogCoord);
+
 #ifdef _WRITE_RENDERING_LAYERS
     uint renderingLayers = GetMeshRenderingLayer();
     outRenderingLayers = float4(EncodeMeshRenderingLayer(renderingLayers), 0, 0, 0);

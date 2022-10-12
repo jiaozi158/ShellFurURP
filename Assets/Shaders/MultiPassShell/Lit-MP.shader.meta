@@ -2,8 +2,17 @@ fileFormatVersion: 2
 guid: 295ee5a5dfb00aa48a251f09d106dcc0
 ShaderImporter:
   externalObjects: {}
-  defaultTextures: []
+  defaultTextures:
+  - _BaseMap: {instanceID: 0}
+  - _FurMap: {fileID: 2800000, guid: d250d755a980dfe40aa9f392cea8fce8, type: 3}
+  - _NormalMap: {fileID: 2800000, guid: e3a27763300e33d408dccd736372af9e, type: 3}
+  - _AOMap: {instanceID: 0}
+  - _FurLengthMap: {instanceID: 0}
+  - _FurDirMap: {instanceID: 0}
+  - _PreIntegratedAverageHairFiberScattering: {fileID: 11700000, guid: c0979f446eb7dfa49a5df9967b0ce7c8,
+      type: 3}
   nonModifiableTextures: []
+  preprocessorOverride: 0
   userData: 
   assetBundleName: 
   assetBundleVariant: 
