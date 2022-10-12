@@ -20,7 +20,18 @@ public class MultiPassFurDepthNormals : ScriptableRendererFeature
             PassNames = new string[] { "UniversalForwardFur", "DepthOnlyFur", "DepthNormalsFur", "ShadowCasterFur", "UniversalGBufferFur" };
         }
     }
-    
+
+    public enum DecalMode
+    {
+        [InspectorName("None")]
+        Invalid,
+        Automatic,
+        [InspectorName("DBuffer")]
+        DBuffer,
+        ScreenSpace,
+        //GBuffer, // Multi-Pass Fur does not render to GBuffer by now.
+    };
+
     [System.Serializable]
     public class PassSettings
     {
@@ -30,8 +41,11 @@ public class MultiPassFurDepthNormals : ScriptableRendererFeature
         // Increase the range if you need more layers.
         [Range(1, 200)]public int ShellAmount = 13;
 
-        // Remove the "[HideInInspector]" if you want to change the RenderPassEvent.
         [Header("Advanced")]
+        [Tooltip("Please specify the current Decal Technique if enabling Decal Renderer Feature. Has no effect when Decal is disabled.")]
+        public DecalMode decalMode = DecalMode.Invalid;
+
+        // Remove the "[HideInInspector]" if you want to change the RenderPassEvent.
         [Tooltip("Controls when to enqueue the fur DepthNormalPrepass rendering. (After Rendering Pre Passes by default)")]
         [HideInInspector] public RenderPassEvent PassEvent = RenderPassEvent.AfterRenderingPrePasses;
 
@@ -41,11 +55,26 @@ public class MultiPassFurDepthNormals : ScriptableRendererFeature
     // C# Reflection
     private readonly static FieldInfo gBufferFieldInfo = typeof(UniversalRenderer).GetField("m_GBufferPass", BindingFlags.NonPublic | BindingFlags.Instance);
     private readonly static FieldInfo activeRenderPassQueueFieldInfo = typeof(ScriptableRenderer).GetField("m_ActiveRenderPassQueue", BindingFlags.NonPublic | BindingFlags.Instance);
+    private readonly static FieldInfo activeRendererFeatureFieldInfo = typeof(ScriptableRenderer).GetField("m_RendererFeatures", BindingFlags.NonPublic | BindingFlags.Instance);
     // For setting RenderTarget use. (unnecessary in URP 12 and below)
 #if UNITY_2022_1_OR_NEWER
     private readonly static FieldInfo normalsTextureFieldInfo = typeof(UniversalRenderer).GetField("m_NormalsTexture", BindingFlags.NonPublic | BindingFlags.Instance);
     private readonly static FieldInfo depthTextureFieldInfo = typeof(UniversalRenderer).GetField("m_DepthTexture", BindingFlags.NonPublic | BindingFlags.Instance);
 #endif
+
+    // From "DecalRendererFeature.cs".
+    public bool IsAutomaticDBuffer()
+    {
+        // As WebGL uses gles here we should not use DBuffer
+#if UNITY_EDITOR
+        if (UnityEditor.EditorUserBuildSettings.selectedBuildTargetGroup == UnityEditor.BuildTargetGroup.WebGL)
+            return false;
+#else
+        if (Application.platform == RuntimePlatform.WebGLPlayer)
+            return false;
+#endif
+        return !GraphicsSettings.HasShaderDefine(BuiltinShaderDefine.SHADER_API_MOBILE);
+    }
 
     public class FurRenderPass : ScriptableRenderPass
     {
@@ -113,7 +142,8 @@ public class MultiPassFurDepthNormals : ScriptableRendererFeature
 #if UNITY_2022_1_OR_NEWER
             if (useDepthPriming && (renderingData.cameraData.renderType == CameraRenderType.Base || renderingData.cameraData.clearDepth) && normalsTextureHandle != null)
                 ConfigureTarget(normalsTextureHandle, renderingData.cameraData.renderer.cameraDepthTargetHandle);
-            else
+            // Avoid null reference exception when Decal Mode (user provide) does not match the actual Decal Mode.
+            else if (normalsTextureHandle != null)
                 ConfigureTarget(normalsTextureHandle, depthTextureHandle);
 #else
             if (useDepthPriming && (renderingData.cameraData.renderType == CameraRenderType.Base || renderingData.cameraData.clearDepth))
@@ -148,6 +178,31 @@ public class MultiPassFurDepthNormals : ScriptableRendererFeature
             rendererFeatureNeedsNormals |= (pass.input & ScriptableRenderPassInput.Normal) != ScriptableRenderPassInput.None;
             // Keep this line for reference when adding fur motionVector pass.
             //rendererFeatureNeedsMotion |= (pass.input & ScriptableRenderPassInput.Motion) != ScriptableRenderPassInput.None;
+        }
+
+        // Decal Renderer Feature is not a Render Pass, and it does not have a public method to return what it needs for rendering. (e.g. DepthNormal required?)
+        // 
+        // If Decal Renderer Feature (DBuffer mode) enabled, enqueue the Fur DepthNormalPrepass.
+        // C# Reflection
+        var activeRendererFeatures = activeRendererFeatureFieldInfo.GetValue(renderer) as List<ScriptableRendererFeature>;
+        for (int i = 0; i < activeRendererFeatures.Count; ++i)
+        {
+            ScriptableRendererFeature feature = activeRendererFeatures[i];
+            // Get the Decal Renderer Feature mode, if it exists.
+            if (feature.isActive && feature.name == "DecalRendererFeature")
+            {
+                // How can we automatically get the current Decal Renderer Feature mode?
+
+                //bool decalNeedsNormals = DBuffer : ScreenSpace?;
+                //rendererFeatureNeedsNormals |= decalNeedsNormals;
+
+                // Need to enqueue a DepthNormalPrepass for fur when using DBuffer Decal.
+                if (settings.decalMode == DecalMode.DBuffer || (settings.decalMode == DecalMode.Automatic) && IsAutomaticDBuffer())
+                {
+                    rendererFeatureNeedsNormals |= true;
+                }
+
+            }
         }
 
         // When should we enqueue DepthNormalPrepass pass:

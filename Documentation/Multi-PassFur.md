@@ -21,8 +21,9 @@ How To Use
 Known Issues
 ------------
 
-1. Currently Multi-Pass Fur does not render to GBuffer, it will act like forward object in Deferred path. (In progress)
-2. Currently Multi-Pass Fur does not render fur shadow, so mesh shadow only. (In progress)
-3. Does not provide clear information to Profiler/Frame Debugger.
-4. ... (Undiscovered)
+1. ~~Currently Multi-Pass Fur does not provide correct information to URP Decals.~~ (Fixed)
+2. Currently Multi-Pass Fur does not render to GBuffer, it will act like forward object in Deferred path. (In progress)
+3. Currently Multi-Pass Fur does not render fur shadow, so mesh shadow only. (In progress)
+4. Does not provide clear information to Profiler/Frame Debugger.
+5. ... (Undiscovered)
 
