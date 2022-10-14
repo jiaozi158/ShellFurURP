@@ -22,21 +22,21 @@ struct Attributes
 struct v2g
 {
     float4 positionOS : POSITION;
-    float3 normalWS : NORMAL;
-    float3 tangentWS : TANGENT;
+    half3  normalWS : NORMAL;
+    half4  tangentWS : TANGENT;
     float2 uv : TEXCOORD0;
-    half3 groomWS : TEXCOORD1;
-    half furLength : TEXCOORD2;
+    half3  groomWS : TEXCOORD1;
+    half   furLength : TEXCOORD2;
     UNITY_VERTEX_INPUT_INSTANCE_ID
 };
 
 struct g2f
 {
-    float4 vertex : SV_POSITION;
+    float4 positionCS : SV_POSITION;
     float2 uv : TEXCOORD0;
     float  layer : TEXCOORD1;
-    half3 normalWS : TEXCOORD2;
-    half3 tangentWS : TEXCOORD3;
+    half3  normalWS : TEXCOORD2;
+    half4  tangentWS : TEXCOORD3;
     UNITY_VERTEX_INPUT_INSTANCE_ID
     UNITY_VERTEX_OUTPUT_STEREO
 };
@@ -64,7 +64,7 @@ v2g vert(Attributes input)
 
     output.positionOS = input.positionOS;
     output.normalWS = normalInput.normalWS;
-    output.tangentWS = normalInput.tangentWS;
+    output.tangentWS = half4(normalInput.tangentWS, input.tangentOS.w);
     output.uv = input.uv;
     return output;
 }
@@ -85,16 +85,15 @@ void AppendShellVertex(inout TriangleStream<g2f> stream, v2g input, int index)
     half clampedShellAmount = clamp(_ShellAmount, 1, 13);
     half shellStep = _TotalShellStep / clampedShellAmount;
 
-    half moveFactor = pow(abs((half)index / clamp(_ShellAmount, 1, 13)), _BaseMove.w);
-    float3 posOS = input.positionOS.xyz;
+    half layer = (half)index / clampedShellAmount;
+
+    half moveFactor = pow(abs(layer), _BaseMove.w);
     half3 windAngle = _Time.w * _WindFreq.xyz;
-    half3 windMove = moveFactor * _WindMove.xyz * sin(windAngle + posOS * _WindMove.w);
+    half3 windMove = moveFactor * _WindMove.xyz * sin(windAngle + input.positionOS.xyz * _WindMove.w);
     half3 move = moveFactor * _BaseMove.xyz;
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Fur Direction
-    half layer = (half)index / clampedShellAmount;
-
     half bent = _BentType * layer + (1 - _BentType);
 
     half3 groomWS = lerp(input.normalWS, input.groomWS, _GroomingIntensity * bent);
@@ -103,7 +102,7 @@ void AppendShellVertex(inout TriangleStream<g2f> stream, v2g input, int index)
 
     float3 posWS = vertexInput.positionWS + shellDir * (shellStep * index * input.furLength * _FurLengthIntensity);
 
-    output.vertex = TransformWorldToHClip(posWS);
+    output.positionCS = TransformWorldToHClip(posWS);
     output.uv = TRANSFORM_TEX(input.uv, _BaseMap);
     output.layer = layer;
 
@@ -129,25 +128,24 @@ void AppendShellVertexInstancing(inout TriangleStream<g2f> stream, v2g input, in
 
     float shellStep = _TotalShellStep / _ShellAmount;
 
-    float moveFactor = pow(abs((float)index / _ShellAmount), _BaseMove.w);
-    float3 posOS = input.positionOS.xyz;
+    float layer = (float)index / _ShellAmount;
+
+    float moveFactor = pow(abs(layer), _BaseMove.w);
     half3 windAngle = _Time.w * _WindFreq.xyz;
-    half3 windMove = moveFactor * _WindMove.xyz * sin(windAngle + posOS * _WindMove.w);
+    half3 windMove = moveFactor * _WindMove.xyz * sin(windAngle + input.positionOS.xyz * _WindMove.w);
     float3 move = moveFactor * _BaseMove.xyz;
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Fur Direction
-    float layer = (float)index / _ShellAmount;
-
     float bent = _BentType * layer + (1 - _BentType);
 
     float3 groomWS = lerp(input.normalWS, input.groomWS, _GroomingIntensity * bent);
     float3 shellDir = SafeNormalize(groomWS + move + windMove);
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    float3 posWS = vertexInput.positionWS + shellDir * (shellStep * index * input.furLength * _FurLengthIntensity);
+    float3 positionWS = vertexInput.positionWS + shellDir * (shellStep * index * input.furLength * _FurLengthIntensity);
 
-    output.vertex = TransformWorldToHClip(posWS);
+    output.positionCS = TransformWorldToHClip(positionWS);
     output.uv = TRANSFORM_TEX(input.uv, _BaseMap);
     output.layer = layer;
 
@@ -213,18 +211,17 @@ half4 frag(g2f input) : SV_Target
 #endif
 
 #ifdef LOD_FADE_CROSSFADE
-    LODFadeCrossFade(input.vertex);
+    LODFadeCrossFade(input.positionCS);
 #endif
 
     half3 normalTS = UnpackNormalScale(
         SAMPLE_TEXTURE2D(_NormalMap, sampler_NormalMap, input.uv / _BaseMap_ST.xy * _FurScale),
         _NormalScale);
 
-    // 1.0 should be tangentOS.w.
-    half3 bitangent = SafeNormalize(1.0 * cross(input.normalWS, input.tangentWS));
+    half3 bitangent = SafeNormalize(input.tangentWS.w * cross(input.normalWS, input.tangentWS.xyz));
     half3 normalWS = SafeNormalize(TransformTangentToWorld(
         normalTS,
-        half3x3(input.tangentWS, bitangent, input.normalWS)));
+        half3x3(input.tangentWS.xyz, bitangent, input.normalWS)));
 
     // Stores World Space Normal to "_CameraNormalsTexture".
     return half4(NormalizeNormalPerPixel(normalWS), 0.0);

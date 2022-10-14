@@ -3,6 +3,7 @@
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SurfaceInput.hlsl"
 #include "./Param.hlsl"
+
 // For VR single pass instance compability:
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 #if defined(LOD_FADE_CROSSFADE)
@@ -21,16 +22,16 @@ struct Attributes
 struct v2g
 {
     float4 positionOS : POSITION;
-    float3 normalWS : NORMAL;
+    half3  normalWS : NORMAL;
     float2 uv : TEXCOORD0;
-    half3 groomWS : TEXCOORD1;
-    half furLength : TEXCOORD2;
+    half3  groomWS : TEXCOORD1;
+    half   furLength : TEXCOORD2;
     UNITY_VERTEX_INPUT_INSTANCE_ID
 };
 
 struct g2f
 {
-    float4 vertex : SV_POSITION;
+    float4 positionCS : SV_POSITION;
     float2 uv : TEXCOORD0;
     float  layer : TEXCOORD1;
     UNITY_VERTEX_INPUT_INSTANCE_ID
@@ -81,25 +82,24 @@ void AppendShellVertex(inout TriangleStream<g2f> stream, v2g input, int index)
     half clampedShellAmount = clamp(_ShellAmount, 1, 13);
     half shellStep = _TotalShellStep / clampedShellAmount;
 
-    half moveFactor = pow(abs((half)index / clamp(_ShellAmount, 1, 13)), _BaseMove.w);
-    float3 posOS = input.positionOS.xyz;
+    half layer = (half)index / clampedShellAmount;
+
+    half moveFactor = pow(abs(layer), _BaseMove.w);
     half3 windAngle = _Time.w * _WindFreq.xyz;
-    half3 windMove = moveFactor * _WindMove.xyz * sin(windAngle + posOS * _WindMove.w);
+    half3 windMove = moveFactor * _WindMove.xyz * sin(windAngle + input.positionOS.xyz * _WindMove.w);
     half3 move = moveFactor * _BaseMove.xyz;
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Fur Direction
-    half layer = (half)index / clampedShellAmount;
-
     half bent = _BentType * layer + (1 - _BentType);
 
     half3 groomWS = lerp(input.normalWS, input.groomWS, _GroomingIntensity * bent);
     half3 shellDir = SafeNormalize(groomWS + move + windMove);
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    float3 posWS = vertexInput.positionWS + shellDir * (shellStep * index * input.furLength * _FurLengthIntensity);
-    
-    output.vertex = TransformWorldToHClip(posWS);
+    float3 positionWS = vertexInput.positionWS + shellDir * (shellStep * index * input.furLength * _FurLengthIntensity);
+
+    output.positionCS = TransformWorldToHClip(positionWS);
     output.uv = TRANSFORM_TEX(input.uv, _BaseMap);
     output.layer = layer;
 
@@ -121,25 +121,24 @@ void AppendShellVertexInstancing(inout TriangleStream<g2f> stream, v2g input, in
 
     float shellStep = _TotalShellStep / _ShellAmount;
 
-    float moveFactor = pow(abs((float)index / _ShellAmount), _BaseMove.w);
-    float3 posOS = input.positionOS.xyz;
+    float layer = (float)index / _ShellAmount;
+
+    float moveFactor = pow(abs(layer), _BaseMove.w);
     half3 windAngle = _Time.w * _WindFreq.xyz;
-    half3 windMove = moveFactor * _WindMove.xyz * sin(windAngle + posOS * _WindMove.w);
+    half3 windMove = moveFactor * _WindMove.xyz * sin(windAngle + input.positionOS.xyz * _WindMove.w);
     float3 move = moveFactor * _BaseMove.xyz;
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Fur Direction
-    float layer = (float)index / _ShellAmount;
-
     float bent = _BentType * layer + (1 - _BentType);
 
     float3 groomWS = lerp(input.normalWS, input.groomWS, _GroomingIntensity * bent);
     float3 shellDir = SafeNormalize(groomWS + move + windMove);
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    float3 posWS = vertexInput.positionWS + shellDir * (shellStep * index * input.furLength * _FurLengthIntensity);
+    float3 positionWS = vertexInput.positionWS + shellDir * (shellStep * index * input.furLength * _FurLengthIntensity);
 
-    output.vertex = TransformWorldToHClip(posWS);
+    output.positionCS = TransformWorldToHClip(positionWS);
     output.uv = TRANSFORM_TEX(input.uv, _BaseMap);
     output.layer = layer;
 
@@ -186,7 +185,8 @@ void geom(triangle v2g input[3], inout TriangleStream<g2f> stream)
 
 float frag(g2f input) : SV_TARGET
 {
-    half4 furColor = SAMPLE_TEXTURE2D(_FurMap, sampler_FurMap, input.uv / _BaseMap_ST.xy * _FurScale);
+    float2 furUV = input.uv / _BaseMap_ST.xy * _FurScale;
+    half4 furColor = SAMPLE_TEXTURE2D(_FurMap, sampler_FurMap, furUV);
     half alpha = furColor.r * (1.0 - input.layer);
 
 #ifdef _ALPHATEST_ON // MSAA Alpha-To-Coverage Mask
@@ -201,10 +201,11 @@ float frag(g2f input) : SV_TARGET
 #endif
 
 #ifdef LOD_FADE_CROSSFADE
-    LODFadeCrossFade(input.vertex);
+    LODFadeCrossFade(input.positionCS);
 #endif
 
-    // Output depth.
-    return input.vertex.z;
+    // Output depth. (No effect there)
+    // The actual depth is handled by the GPU according to SV_POSITION.
+    return input.positionCS.z;
 }
 #endif

@@ -395,7 +395,6 @@ SubShader
         #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SurfaceInput.hlsl"
         #include "./Param.hlsl"
         #include "./LitMetaPass.hlsl"
-        
 
         #pragma vertex UniversalVertexMeta
         #pragma fragment UniversalFragmentMetaLit
