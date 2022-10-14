@@ -15,6 +15,13 @@ unevenly mapped UV:
  ![UnevenlyMappedUV](https://github.com/jiaozi158/ShellFurURP/blob/main/Documentation/Images/Tips/UnevenlyMappedUV.png)
 
 
+It is suggested to adjust URP shadow bias. (URP Asset or Per Light)
+
+example of a proper shadow bias:
+
+ ![URPAssetShadowBias](https://github.com/jiaozi158/ShellFurURP/blob/main/Documentation/Images/Tips/Fur_ShadowBias.jpg)
+
+
 Performance Tips
 ------------
 

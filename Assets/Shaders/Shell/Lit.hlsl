@@ -34,15 +34,15 @@ struct Attributes
 struct v2g
 {
     float4 positionOS : POSITION;
-    half3 normalWS : NORMAL;
-    half4 tangentWS : TEXCOORD2; // w is tangentOS.w
-    float2 uv : TEXCOORD0;
-    float2 staticLightmapUV : TEXCOORD1;
+    half3  normalWS : NORMAL;
+    half4  tangentWS : TEXCOORD0; // w is tangentOS.w
+    float2 uv : TEXCOORD1;
+    float2 staticLightmapUV : TEXCOORD2;
+    half3  groomWS : TEXCOORD3;
+    half   furLength : TEXCOORD4;
 #ifdef DYNAMICLIGHTMAP_ON
-    float2  dynamicLightmapUV : TEXCOORD2;
+    float2 dynamicLightmapUV : TEXCOORD5;
 #endif
-    half3 groomWS : TEXCOORD3;
-    half furLength : TEXCOORD4;
     UNITY_VERTEX_INPUT_INSTANCE_ID
 };
 
@@ -50,15 +50,15 @@ struct g2f
 {
     float4 positionCS : SV_POSITION;
     float3 positionWS : TEXCOORD0;
-    half3 normalWS : TEXCOORD1;
-    half4 tangentWS : TEXCOORD2; // w is tangentOS.w
-    float2 uv : TEXCOORD4;
-    DECLARE_LIGHTMAP_OR_SH(staticLightmapUV, vertexSH, 5);
-    half fogFactor : TEXCOORD6;
-    float  layer : TEXCOORD7;
+    half3  normalWS : TEXCOORD1;
+    half4  tangentWS : TEXCOORD2; // w is tangentOS.w
+    float2 uv : TEXCOORD3;
+    half   fogFactor : TEXCOORD4;
+    float  layer : TEXCOORD5;
 #ifdef DYNAMICLIGHTMAP_ON
-    float2  dynamicLightmapUV : TEXCOORD8;
+    float2 dynamicLightmapUV : TEXCOORD6;
 #endif
+    DECLARE_LIGHTMAP_OR_SH(staticLightmapUV, vertexSH, 7);
     UNITY_VERTEX_INPUT_INSTANCE_ID
     UNITY_VERTEX_OUTPUT_STEREO
 };
@@ -112,16 +112,15 @@ void AppendShellVertex(inout TriangleStream<g2f> stream, v2g input, int index)
     half clampedShellAmount = clamp(_ShellAmount, 1, 13);
     half shellStep = _TotalShellStep / clampedShellAmount;
 
-    half moveFactor = pow(abs((half)index / clampedShellAmount), _BaseMove.w);
-    float3 posOS = input.positionOS.xyz;
+    half layer = (half)index / clampedShellAmount;
+
+    half moveFactor = pow(abs(layer), _BaseMove.w);
     half3 windAngle = _Time.w * _WindFreq.xyz;
-    half3 windMove = moveFactor * _WindMove.xyz * sin(windAngle + posOS * _WindMove.w);
+    half3 windMove = moveFactor * _WindMove.xyz * sin(windAngle + input.positionOS.xyz * _WindMove.w);
     half3 move = moveFactor * _BaseMove.xyz;
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Fur Direction
-    half layer = (half)index / clampedShellAmount;
-
     half bent = _BentType * layer + (1 - _BentType);
 
     half3 groomWS = lerp(input.normalWS, input.groomWS, _GroomingIntensity * bent);
@@ -147,7 +146,6 @@ void AppendShellVertex(inout TriangleStream<g2f> stream, v2g input, int index)
 #endif
     OUTPUT_SH(output.normalWS.xyz, output.vertexSH);
 
-
     stream.Append(output);
 }
 
@@ -166,16 +164,15 @@ void AppendShellVertexInstancing(inout TriangleStream<g2f> stream, v2g input, in
 
     float shellStep = _TotalShellStep / _ShellAmount;
 
-    float moveFactor = pow(abs((float)index / _ShellAmount), _BaseMove.w);
-    float3 posOS = input.positionOS.xyz;
+    float layer = (float)index / _ShellAmount;
+
+    float moveFactor = pow(abs(layer), _BaseMove.w);
     half3 windAngle = _Time.w * _WindFreq.xyz;
-    half3 windMove = moveFactor * _WindMove.xyz * sin(windAngle + posOS * _WindMove.w);
+    half3 windMove = moveFactor * _WindMove.xyz * sin(windAngle + input.positionOS.xyz * _WindMove.w);
     float3 move = moveFactor * _BaseMove.xyz;
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Fur Direction
-    float layer = (float)index / _ShellAmount;
-
     float bent = _BentType * layer + (1 - _BentType);
 
     float3 groomWS = lerp(input.normalWS, input.groomWS, _GroomingIntensity * bent);
@@ -266,8 +263,8 @@ void frag(g2f input
 #endif
 )
 {
-    float2 furUv = input.uv / _BaseMap_ST.xy * _FurScale;
-    half4 furColor = SAMPLE_TEXTURE2D(_FurMap, sampler_FurMap, furUv);
+    float2 furUV = input.uv / _BaseMap_ST.xy * _FurScale;
+    half4 furColor = SAMPLE_TEXTURE2D(_FurMap, sampler_FurMap, furUV);
     half alpha = furColor.r * (1.0 - input.layer);
 
 #ifdef _ALPHATEST_ON // MSAA Alpha-To-Coverage Mask
@@ -283,7 +280,7 @@ void frag(g2f input
 
     float3 viewDirWS = SafeNormalize(GetCameraPositionWS() - input.positionWS);
     half3 normalTS = UnpackNormalScale(
-        SAMPLE_TEXTURE2D(_NormalMap, sampler_NormalMap, furUv),
+        SAMPLE_TEXTURE2D(_NormalMap, sampler_NormalMap, furUV),
         _NormalScale);
 
     half3 bitangent = SafeNormalize(input.tangentWS.w * cross(input.normalWS, input.tangentWS.xyz));

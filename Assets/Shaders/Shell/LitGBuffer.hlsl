@@ -8,6 +8,7 @@
 #include "./FurSpecular.hlsl"
 #endif
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/UnityGBuffer.hlsl"
+
 // VR single pass instance compability:
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 #if defined(LOD_FADE_CROSSFADE)
@@ -19,24 +20,24 @@ struct Attributes
     float4 positionOS : POSITION;
     float3 normalOS : NORMAL;
     float4 tangentOS : TANGENT;
-    float2 texcoord : TEXCOORD0;
+    float2 uv : TEXCOORD0;
     float2 staticLightmapUV : TEXCOORD1;
-    float2  dynamicLightmapUV : TEXCOORD2; // Dynamic lightmap UVs
+    float2 dynamicLightmapUV : TEXCOORD2; // Dynamic lightmap UVs
     UNITY_VERTEX_INPUT_INSTANCE_ID
 };
 
 struct v2g
 {
     float4 positionOS : POSITION;
-    float3 normalWS : NORMAL;
-    float3 tangentWS : TANGENT;
-    float2 texcoord : TEXCOORD0;
+    half3 normalWS : NORMAL;
+    half4 tangentWS : TANGENT; // w is tangentOS.w
+    float2 uv : TEXCOORD0;
     float2 staticLightmapUV : TEXCOORD1;
+    half3  groomWS : TEXCOORD2;
+    half   furLength : TEXCOORD3;
 #ifdef DYNAMICLIGHTMAP_ON
-    float2  dynamicLightmapUV : TEXCOORD2;
+    float2 dynamicLightmapUV : TEXCOORD4;
 #endif
-    half3 groomWS : TEXCOORD3;
-    half furLength : TEXCOORD4;
     UNITY_VERTEX_INPUT_INSTANCE_ID
 };
 
@@ -44,14 +45,14 @@ struct g2f
 {
     float4 positionCS : SV_POSITION;
     float3 positionWS : TEXCOORD0;
-    half3 normalWS : TEXCOORD1;
-    half3 tangentWS : TEXCOORD2;
-    float2 uv : TEXCOORD4;
-    DECLARE_LIGHTMAP_OR_SH(staticLightmapUV, vertexSH, 5);
-    float  layer : TEXCOORD6;
+    half3  normalWS : TEXCOORD1;
+    half4  tangentWS : TEXCOORD2; // w is tangentOS.w
+    float2 uv : TEXCOORD3;
+    float  layer : TEXCOORD4;
 #ifdef DYNAMICLIGHTMAP_ON
-    float2  dynamicLightmapUV : TEXCOORD7;
+    float2 dynamicLightmapUV : TEXCOORD5;
 #endif
+    DECLARE_LIGHTMAP_OR_SH(staticLightmapUV, vertexSH, 6);
     UNITY_VERTEX_INPUT_INSTANCE_ID
     UNITY_VERTEX_OUTPUT_STEREO
 };
@@ -70,18 +71,18 @@ v2g vert(Attributes input)
     VertexNormalInputs normalInput = GetVertexNormalInputs(input.normalOS, input.tangentOS);
 
     // Fur Direction and Length (reusable data for geometry shader)
-    half3 groomTS = SafeNormalize(UnpackNormal(SAMPLE_TEXTURE2D_LOD(_FurDirMap, sampler_FurDirMap, input.texcoord / _BaseMap_ST.xy, 0).xyzw));
+    half3 groomTS = SafeNormalize(UnpackNormal(SAMPLE_TEXTURE2D_LOD(_FurDirMap, sampler_FurDirMap, input.uv / _BaseMap_ST.xy, 0).xyzw));
 
     output.groomWS = SafeNormalize(TransformTangentToWorld(
         groomTS,
         half3x3(normalInput.tangentWS, normalInput.bitangentWS, normalInput.normalWS)));
 
-    output.furLength = SAMPLE_TEXTURE2D_LOD(_FurLengthMap, sampler_FurLengthMap, input.texcoord / _BaseMap_ST.xy, 0).x;
+    output.furLength = SAMPLE_TEXTURE2D_LOD(_FurLengthMap, sampler_FurLengthMap, input.uv / _BaseMap_ST.xy, 0).x;
 
     output.positionOS = input.positionOS;
     output.normalWS = normalInput.normalWS;
-    output.tangentWS = normalInput.tangentWS;
-    output.texcoord = input.texcoord;
+    output.tangentWS = half4(normalInput.tangentWS, input.tangentOS.w);
+    output.uv = input.uv;
     output.staticLightmapUV = input.staticLightmapUV;
 #ifdef DYNAMICLIGHTMAP_ON
     output.dynamicLightmapUV = input.dynamicLightmapUV.xy * unity_DynamicLightmapST.xy + unity_DynamicLightmapST.zw;
@@ -105,16 +106,15 @@ void AppendShellVertex(inout TriangleStream<g2f> stream, v2g input, int index)
     half clampedShellAmount = clamp(_ShellAmount, 1, 13);
     half shellStep = _TotalShellStep / clampedShellAmount;
 
-    half moveFactor = pow(abs((half)index / clampedShellAmount), _BaseMove.w);
-    float3 posOS = input.positionOS.xyz;
+    half layer = (half)index / clampedShellAmount;
+
+    half moveFactor = pow(abs(layer), _BaseMove.w);
     half3 windAngle = _Time.w * _WindFreq.xyz;
-    half3 windMove = moveFactor * _WindMove.xyz * sin(windAngle + posOS * _WindMove.w);
+    half3 windMove = moveFactor * _WindMove.xyz * sin(windAngle + input.positionOS.xyz * _WindMove.w);
     half3 move = moveFactor * _BaseMove.xyz;
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Fur Direction
-    half layer = (half)index / clampedShellAmount;
-
     half bent = _BentType * layer + (1 - _BentType);
 
     half3 groomWS = lerp(input.normalWS, input.groomWS, _GroomingIntensity * bent);
@@ -123,7 +123,7 @@ void AppendShellVertex(inout TriangleStream<g2f> stream, v2g input, int index)
 
     output.positionWS = vertexInput.positionWS + shellDir * (shellStep * index * input.furLength * _FurLengthIntensity);
     output.positionCS = TransformWorldToHClip(output.positionWS);
-    output.uv = TRANSFORM_TEX(input.texcoord, _BaseMap);
+    output.uv = TRANSFORM_TEX(input.uv, _BaseMap);
     output.normalWS = input.normalWS;
     output.tangentWS = input.tangentWS;
     output.layer = layer;
@@ -153,16 +153,15 @@ void AppendShellVertexInstancing(inout TriangleStream<g2f> stream, v2g input, in
 
     float shellStep = _TotalShellStep / _ShellAmount;
 
-    float moveFactor = pow(abs((float)index / _ShellAmount), _BaseMove.w);
-    float3 posOS = input.positionOS.xyz;
+    float layer = (float)index / _ShellAmount;
+
+    float moveFactor = pow(abs(layer), _BaseMove.w);
     half3 windAngle = _Time.w * _WindFreq.xyz;
-    half3 windMove = moveFactor * _WindMove.xyz * sin(windAngle + posOS * _WindMove.w);
+    half3 windMove = moveFactor * _WindMove.xyz * sin(windAngle + input.positionOS.xyz * _WindMove.w);
     float3 move = moveFactor * _BaseMove.xyz;
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Fur Direction
-    float layer = (float)index / _ShellAmount;
-
     float bent = _BentType * layer + (1 - _BentType);
 
     float3 groomWS = lerp(input.normalWS, input.groomWS, _GroomingIntensity * bent);
@@ -171,7 +170,7 @@ void AppendShellVertexInstancing(inout TriangleStream<g2f> stream, v2g input, in
 
     output.positionWS = vertexInput.positionWS + shellDir * (shellStep * index * input.furLength * _FurLengthIntensity);
     output.positionCS = TransformWorldToHClip(output.positionWS);
-    output.uv = TRANSFORM_TEX(input.texcoord, _BaseMap);
+    output.uv = TRANSFORM_TEX(input.uv, _BaseMap);
     output.normalWS = input.normalWS;
     output.tangentWS = input.tangentWS;
     output.layer = layer;
@@ -228,20 +227,20 @@ void geom(triangle v2g input[3], inout TriangleStream<g2f> stream)
 
 FragmentOutput frag(g2f input)
 {
-    float2 furUv = input.uv / _BaseMap_ST.xy * _FurScale;
-    half4 furColor = SAMPLE_TEXTURE2D(_FurMap, sampler_FurMap, furUv);
+    float2 furUV = input.uv / _BaseMap_ST.xy * _FurScale;
+    half4 furColor = SAMPLE_TEXTURE2D(_FurMap, sampler_FurMap, furUV);
     half alpha = furColor.r * (1.0 - input.layer);
     if (input.layer > 0.0 && alpha < _AlphaCutout) discard;
 
     float3 viewDirWS = SafeNormalize(GetCameraPositionWS() - input.positionWS);
     half3 normalTS = UnpackNormalScale(
-        SAMPLE_TEXTURE2D(_NormalMap, sampler_NormalMap, furUv),
+        SAMPLE_TEXTURE2D(_NormalMap, sampler_NormalMap, furUV),
         _NormalScale);
     // 1.0 should be tangentOS.w, not passing it to fragment shader to keep 39 max vertex counts.
-    half3 bitangent = SafeNormalize(1.0 * cross(input.normalWS, input.tangentWS));
+    half3 bitangent = SafeNormalize(input.tangentWS.w * cross(input.normalWS, input.tangentWS.xyz));
     half3 normalWS = SafeNormalize(TransformTangentToWorld(
         normalTS,
-        half3x3(input.tangentWS, bitangent, input.normalWS)));
+        half3x3(input.tangentWS.xyz, bitangent, input.normalWS)));
 
     SurfaceData surfaceData = (SurfaceData)0;
 
@@ -269,7 +268,7 @@ FragmentOutput frag(g2f input)
 #if defined(MAIN_LIGHT_CALCULATE_SHADOWS)
     inputData.shadowCoord = TransformWorldToShadowCoord(input.positionWS);
 #else
-    inputData.shadowCoord = half4(0, 0, 0, 0);
+    inputData.shadowCoord = float4(0, 0, 0, 0);
 #endif
     inputData.fogCoord = 0.0; // URP doesn't apply fog in gbuffer pass.
 
@@ -294,6 +293,7 @@ FragmentOutput frag(g2f input)
 
     // Get the main light.
     Light mainLight = GetMainLight(inputData.shadowCoord, inputData.positionWS, inputData.shadowMask);
+    _ConsiderShadow = _ConsiderShadow == 1 ? 0 : 1; // Remap from 1/0 to 0/1.
 
     half3 color = half3(0.0, 0.0, 0.0);
 
@@ -323,10 +323,7 @@ FragmentOutput frag(g2f input)
     if (IsMatchingLightLayer(mainLight.layerMask, meshRenderingLayers))
 #endif
     {
-        half3 mainLightColor = mainLight.color.rgb * mainLight.distanceAttenuation;
-        // "Screen" blend mode.
-        mainLightColor = (1 - (1 - s.Albedo) * (1 - mainLightColor));
-
+        half3 mainLightColor = mainLight.color.rgb * mainLight.distanceAttenuation * saturate(mainLight.shadowAttenuation + _ConsiderShadow);
         color += (mainLightColor * FurBSDFYan(s, mainLight.direction, viewDirWS, normalWS, 1.0, _Backlit, _Area));
     }
 
@@ -343,9 +340,7 @@ FragmentOutput frag(g2f input)
         if (IsMatchingLightLayer(light.layerMask, meshRenderingLayers))
 #endif
         {
-            half3 lightColor = light.color.rgb * light.distanceAttenuation;
-            // "Screen" blend mode.
-            lightColor = (1 - (1 - s.Albedo) * (1 - lightColor));
+            half3 lightColor = light.color.rgb * light.distanceAttenuation * saturate(light.shadowAttenuation + _ConsiderShadow);
             color += (lightColor * FurBSDFYan(s, light.direction, viewDirWS, normalWS, 1.0, _Backlit, _Area));
         }
     }

@@ -8,6 +8,7 @@
 #include "./FurSpecular-MP.hlsl"
 #endif
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/UnityGBuffer.hlsl"
+
 // VR single pass instance compability:
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 #if defined(LOD_FADE_CROSSFADE)
@@ -19,9 +20,9 @@ struct Attributes
     float4 positionOS : POSITION;
     float3 normalOS : NORMAL;
     float4 tangentOS : TANGENT;
-    float2 texcoord : TEXCOORD0;
+    float2 uv : TEXCOORD0;
     float2 staticLightmapUV : TEXCOORD1;
-    float2  dynamicLightmapUV : TEXCOORD2; // Dynamic lightmap UVs
+    float2 dynamicLightmapUV : TEXCOORD2; // Dynamic lightmap UVs
     UNITY_VERTEX_INPUT_INSTANCE_ID
 };
 
@@ -29,14 +30,14 @@ struct Varyings
 {
     float4 positionCS : SV_POSITION;
     float3 positionWS : TEXCOORD0;
-    half3 normalWS : TEXCOORD1;
-    half3 tangentWS : TEXCOORD2;
-    float2 uv : TEXCOORD4;
-    DECLARE_LIGHTMAP_OR_SH(staticLightmapUV, vertexSH, 5);
-    float  layer : TEXCOORD6;
+    half3  normalWS : TEXCOORD1;
+    half4  tangentWS : TEXCOORD2; // w is tangentOS.w
+    float2 uv : TEXCOORD3;
+    float  layer : TEXCOORD4;
 #ifdef DYNAMICLIGHTMAP_ON
-    float2  dynamicLightmapUV : TEXCOORD7;
+    float2 dynamicLightmapUV : TEXCOORD5;
 #endif
+    DECLARE_LIGHTMAP_OR_SH(staticLightmapUV, vertexSH, 6);
     UNITY_VERTEX_INPUT_INSTANCE_ID
     UNITY_VERTEX_OUTPUT_STEREO
 };
@@ -57,25 +58,25 @@ Varyings vert(Attributes input)
     VertexNormalInputs normalInput = GetVertexNormalInputs(input.normalOS, input.tangentOS);
 
     // Fur Direction and Length.
-    half3 groomTS = SafeNormalize(UnpackNormal(SAMPLE_TEXTURE2D_LOD(_FurDirMap, sampler_FurDirMap, input.texcoord / _BaseMap_ST.xy, 0).xyzw));
+    half3 groomTS = SafeNormalize(UnpackNormal(SAMPLE_TEXTURE2D_LOD(_FurDirMap, sampler_FurDirMap, input.uv / _BaseMap_ST.xy, 0).xyzw));
 
     half3 groomWS = SafeNormalize(TransformTangentToWorld(
         groomTS,
         half3x3(normalInput.tangentWS, normalInput.bitangentWS, normalInput.normalWS)));
 
-    half furLength = SAMPLE_TEXTURE2D_LOD(_FurLengthMap, sampler_FurLengthMap, input.texcoord / _BaseMap_ST.xy, 0).x;
+    half furLength = SAMPLE_TEXTURE2D_LOD(_FurLengthMap, sampler_FurLengthMap, input.uv / _BaseMap_ST.xy, 0).x;
 
     float shellStep = _TotalShellStep / _TOTAL_LAYER;
 
-    half moveFactor = pow(abs(_CURRENT_LAYER / _TOTAL_LAYER), _BaseMove.w);
+    float layer = _CURRENT_LAYER / _TOTAL_LAYER;
+
+    half moveFactor = pow(abs(layer), _BaseMove.w);
     half3 windAngle = _Time.w * _WindFreq.xyz;
     half3 windMove = moveFactor * _WindMove.xyz * sin(windAngle + input.positionOS.xyz * _WindMove.w);
     half3 move = moveFactor * _BaseMove.xyz;
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Fur Direction
-    float layer = _CURRENT_LAYER / _TOTAL_LAYER;
-
     float bent = _BentType * layer + (1 - _BentType);
 
     groomWS = lerp(normalInput.normalWS, groomWS, _GroomingIntensity * bent);
@@ -84,9 +85,9 @@ Varyings vert(Attributes input)
 
     output.positionWS = vertexInput.positionWS + shellDir * (shellStep * _CURRENT_LAYER * furLength * _FurLengthIntensity);
     output.positionCS = TransformWorldToHClip(output.positionWS);
-    output.uv = TRANSFORM_TEX(input.texcoord, _BaseMap);
+    output.uv = TRANSFORM_TEX(input.uv, _BaseMap);
     output.normalWS = normalInput.normalWS;
-    output.tangentWS = normalInput.tangentWS;
+    output.tangentWS = half4(normalInput.tangentWS, input.tangentOS.w);
     output.layer = layer;
 
     OUTPUT_LIGHTMAP_UV(input.staticLightmapUV, unity_LightmapST, output.staticLightmapUV);
@@ -100,20 +101,20 @@ Varyings vert(Attributes input)
 
 FragmentOutput frag(Varyings input)
 {
-    float2 furUv = input.uv / _BaseMap_ST.xy * _FurScale;
-    half4 furColor = SAMPLE_TEXTURE2D(_FurMap, sampler_FurMap, furUv);
+    float2 furUV = input.uv / _BaseMap_ST.xy * _FurScale;
+    half4 furColor = SAMPLE_TEXTURE2D(_FurMap, sampler_FurMap, furUV);
     half alpha = furColor.r * (1.0 - input.layer);
     if (input.layer > 0.0 && alpha < _AlphaCutout) discard;
 
     float3 viewDirWS = SafeNormalize(GetCameraPositionWS() - input.positionWS);
     half3 normalTS = UnpackNormalScale(
-        SAMPLE_TEXTURE2D(_NormalMap, sampler_NormalMap, furUv),
+        SAMPLE_TEXTURE2D(_NormalMap, sampler_NormalMap, furUV),
         _NormalScale);
-    // 1.0 should be tangentOS.w, not passing it to fragment shader to keep 39 max vertex counts.
-    half3 bitangent = SafeNormalize(1.0 * cross(input.normalWS, input.tangentWS));
+
+    half3 bitangent = SafeNormalize(input.tangentWS.w * cross(input.normalWS, input.tangentWS.xyz));
     half3 normalWS = SafeNormalize(TransformTangentToWorld(
         normalTS,
-        half3x3(input.tangentWS, bitangent, input.normalWS)));
+        half3x3(input.tangentWS.xyz, bitangent, input.normalWS)));
 
     SurfaceData surfaceData = (SurfaceData)0;
 
@@ -166,6 +167,7 @@ FragmentOutput frag(Varyings input)
 
     // Get the main light.
     Light mainLight = GetMainLight(inputData.shadowCoord, inputData.positionWS, inputData.shadowMask);
+    _ConsiderShadow = _ConsiderShadow == 1 ? 0 : 1; // Remap from 1/0 to 0/1.
 
     half3 color = half3(0.0, 0.0, 0.0);
 
@@ -195,10 +197,7 @@ FragmentOutput frag(Varyings input)
     if (IsMatchingLightLayer(mainLight.layerMask, meshRenderingLayers))
 #endif
     {
-        half3 mainLightColor = mainLight.color.rgb * mainLight.distanceAttenuation;
-        // "Screen" blend mode.
-        mainLightColor = (1 - (1 - s.Albedo) * (1 - mainLightColor));
-
+        half3 mainLightColor = mainLight.color.rgb * mainLight.distanceAttenuation * saturate(mainLight.shadowAttenuation + _ConsiderShadow);
         color += (mainLightColor * FurBSDFYan(s, mainLight.direction, viewDirWS, normalWS, 1.0, _Backlit, _Area));
     }
 
@@ -215,9 +214,7 @@ FragmentOutput frag(Varyings input)
         if (IsMatchingLightLayer(light.layerMask, meshRenderingLayers))
 #endif
         {
-            half3 lightColor = light.color.rgb * light.distanceAttenuation;
-            // "Screen" blend mode.
-            lightColor = (1 - (1 - s.Albedo) * (1 - lightColor));
+            half3 lightColor = light.color.rgb * light.distanceAttenuation * saturate(light.shadowAttenuation + _ConsiderShadow);
             color += (lightColor * FurBSDFYan(s, light.direction, viewDirWS, normalWS, 1.0, _Backlit, _Area));
         }
     }

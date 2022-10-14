@@ -37,13 +37,13 @@ struct Varyings
     float3 positionWS : TEXCOORD0;
     half3 normalWS : TEXCOORD1;
     half4 tangentWS : TEXCOORD2; // w is tangentOS.w
-    float2 uv : TEXCOORD4;
-    DECLARE_LIGHTMAP_OR_SH(staticLightmapUV, vertexSH, 5);
-    half fogFactor : TEXCOORD6;
-    float  layer : TEXCOORD7;
+    float2 uv : TEXCOORD3;
+    half fogFactor : TEXCOORD4;
+    float  layer : TEXCOORD5;
 #ifdef DYNAMICLIGHTMAP_ON
-    float2  dynamicLightmapUV : TEXCOORD8;
+    float2  dynamicLightmapUV : TEXCOORD6;
 #endif
+    DECLARE_LIGHTMAP_OR_SH(staticLightmapUV, vertexSH, 7);
     UNITY_VERTEX_INPUT_INSTANCE_ID
     UNITY_VERTEX_OUTPUT_STEREO
 };
@@ -74,15 +74,15 @@ Varyings vert(Attributes input)
 
     float shellStep = _TotalShellStep / _TOTAL_LAYER;
 
-    half moveFactor = pow(abs(_CURRENT_LAYER / _TOTAL_LAYER), _BaseMove.w);
+    float layer = _CURRENT_LAYER / _TOTAL_LAYER;
+
+    half moveFactor = pow(abs(layer), _BaseMove.w);
     half3 windAngle = _Time.w * _WindFreq.xyz;
     half3 windMove = moveFactor * _WindMove.xyz * sin(windAngle + input.positionOS.xyz * _WindMove.w);
     half3 move = moveFactor * _BaseMove.xyz;
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Fur Direction
-    float layer = _CURRENT_LAYER / _TOTAL_LAYER;
-
     float bent = _BentType * layer + (1 - _BentType);
 
     groomWS = lerp(normalInput.normalWS, groomWS, _GroomingIntensity * bent);
@@ -117,8 +117,8 @@ void frag(Varyings input
 #endif
 )
 {
-    float2 furUv = input.uv / _BaseMap_ST.xy * _FurScale;
-    half4 furColor = SAMPLE_TEXTURE2D(_FurMap, sampler_FurMap, furUv);
+    float2 furUV = input.uv / _BaseMap_ST.xy * _FurScale;
+    half4 furColor = SAMPLE_TEXTURE2D(_FurMap, sampler_FurMap, furUV);
     half alpha = furColor.r * (1.0 - input.layer);
 
 #ifdef _ALPHATEST_ON // MSAA Alpha-To-Coverage Mask
@@ -134,7 +134,7 @@ void frag(Varyings input
 
     float3 viewDirWS = SafeNormalize(GetCameraPositionWS() - input.positionWS);
     half3 normalTS = UnpackNormalScale(
-        SAMPLE_TEXTURE2D(_NormalMap, sampler_NormalMap, furUv),
+        SAMPLE_TEXTURE2D(_NormalMap, sampler_NormalMap, furUV),
         _NormalScale);
 
     half3 bitangent = SafeNormalize(input.tangentWS.w * cross(input.normalWS, input.tangentWS.xyz));

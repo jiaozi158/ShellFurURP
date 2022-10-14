@@ -63,7 +63,7 @@ Properties
     _RootSmoothness("Root Smoothness", Range(0.0, 1.0)) = 0.6
     _TipSmoothness("Tip Smoothness", Range(0.0, 1.0)) = 0.8
     // The angle (in degrees) that the scales on a hair fiber tilt from the strand direction.
-    // For human hair, this value is usually between 2 to 3 degrees. Use this property to¡°shift¡±the highlight.
+    // For human hair, this value is usually between 2 to 3 degrees. Use this property to "shift" the highlight.
     _CuticleAngle("Cuticle Angle", Float) = 3.0
     // Controls the internal scattering of light paths and the amount of light the hair fiber absorbs.
     // 0.7 is good for human hair, animal fur would be lower.
@@ -136,7 +136,6 @@ SubShader
         #pragma shader_feature_fragment _ _FUR_SPECULAR
         #pragma shader_feature_fragment _ _FUR_RIM_LIGHTING
         #pragma shader_feature_fragment _ _MATERIAL_TYPE_PHYSICAL_HAIR
-        //#pragma multi_compile _ _GEOM_INSTANCING
 
         // Unity Keywords
         #pragma multi_compile _ DIRLIGHTMAP_COMBINED
@@ -147,14 +146,9 @@ SubShader
         #pragma multi_compile _ DOTS_INSTANCING_ON
         #pragma multi_compile_fragment _ DEBUG_DISPLAY
 
-        //#pragma prefer_hlslcc gles
         #pragma exclude_renderers gles
-        // if "_GEOM_INSTANCING", then Microsoft ShaderModel 4.1 (geometry shader instancing support)
-        // It is "target 4.6" in Unity. (Tested on OpenGL 4.1, instancing not supported on OpenGL 4.0)
-        //#pragma target 4.6 _GEOM_INSTANCING
+
         #pragma vertex vert
-        //#pragma require geometry
-        //#pragma geometry geom
         #pragma fragment frag
         #include "./Lit-MP.hlsl"
         ENDHLSL
@@ -169,18 +163,15 @@ SubShader
         ColorMask R
 
         HLSLPROGRAM
-        //#pragma multi_compile _ _GEOM_INSTANCING
 #if (UNITY_VERSION >= 202220)
         #pragma shader_feature_local_fragment _ _ALPHATEST_ON
+        #pragma multi_compile_fragment _ LOD_FADE_CROSSFADE
 #endif
 
         #pragma exclude_renderers gles
+
         #pragma vertex vert
-        //#pragma require geometry
-        //#pragma geometry geom
         #pragma fragment frag
-        //#pragma target 4.6 _GEOM_INSTANCING
-        //#include "./Depth-MP.hlsl"
         #include "./Depth-MP.hlsl"
         ENDHLSL
     }
@@ -193,17 +184,15 @@ SubShader
         ZWrite On
 
         HLSLPROGRAM
-        //#pragma multi_compile _ _GEOM_INSTANCING
 #if (UNITY_VERSION >= 202220)
         #pragma shader_feature_local_fragment _ _ALPHATEST_ON
+        #pragma multi_compile_fragment _ LOD_FADE_CROSSFADE
 #endif
 
         #pragma exclude_renderers gles
+
         #pragma vertex vert
-        //#pragma require geometry
-        //#pragma geometry geom
         #pragma fragment frag
-        //#pragma target 4.6 _GEOM_INSTANCING
         #include "./DepthNormals-MP.hlsl"
         ENDHLSL
     }
@@ -218,22 +207,21 @@ SubShader
         ColorMask 0
 
         HLSLPROGRAM
-        //#pragma multi_compile _ _GEOM_INSTANCING
-        #pragma multi_compile _ _NO_FUR_SHADOW
+        //#pragma multi_compile _ _NO_FUR_SHADOW
 #if (UNITY_VERSION >= 202220)
         #pragma shader_feature_local_fragment _ _ALPHATEST_ON
+        #pragma multi_compile_fragment _ LOD_FADE_CROSSFADE
 #endif
 
         #pragma exclude_renderers gles
+
         #pragma vertex vert
-        //#pragma require geometry
-        //#pragma geometry geom
         #pragma fragment frag
-        //#pragma target 4.6 _GEOM_INSTANCING
         #include "./Shadow-MP.hlsl"
         ENDHLSL
     }
 
+    // Does not support GBuffer by now.
     Pass
     {
         Name "GBuffer"
@@ -250,6 +238,7 @@ SubShader
         #pragma multi_compile_fragment _ _RENDER_PASS_ENABLED
 #if (UNITY_VERSION >= 202220)
         #pragma multi_compile_fragment _ _WRITE_RENDERING_LAYERS
+        #pragma multi_compile_fragment _ LOD_FADE_CROSSFADE
 #endif
 
         #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
@@ -262,7 +251,6 @@ SubShader
         #pragma multi_compile_fragment _ _FUR_SPECULAR_DEFERRED
         #pragma shader_feature_fragment _ _FUR_RIM_LIGHTING
         #pragma shader_feature_fragment _ _FUR_RIM_LIGHTING_DEFERRED
-        //#pragma multi_compile _ _GEOM_INSTANCING
 
         // Unity Keywords
         #pragma multi_compile _ LIGHTMAP_SHADOW_MIXING
@@ -273,15 +261,10 @@ SubShader
         #pragma multi_compile_instancing
         #pragma multi_compile _ DOTS_INSTANCING_ON
 
-        //#pragma prefer_hlslcc gles
         #pragma exclude_renderers gles
-        // if "_GEOM_INSTANCING", then Microsoft ShaderModel 4.1 (geometry shader instancing support)
-        // It is "target 4.6" in Unity. (Tested on OpenGL 4.1, instancing not supported on OpenGL 4.0)
-        //#pragma target 4.6 _GEOM_INSTANCING
+
         #pragma target 3.5
         #pragma vertex vert
-        //#pragma require geometry
-        //#pragma geometry geom
         #pragma fragment frag
         #include "./LitGBuffer-MP.hlsl"
         ENDHLSL
@@ -305,7 +288,6 @@ SubShader
         #include "./Param-MP.hlsl"
         #include "./LitMetaPass-MP.hlsl"
         
-
         #pragma vertex UniversalVertexMeta
         #pragma fragment UniversalFragmentMetaLit
         ENDHLSL

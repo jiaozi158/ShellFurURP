@@ -6,6 +6,7 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SurfaceInput.hlsl"
 #include "./Param-MP.hlsl"
 #include "./Common-MP.hlsl"
+
 // For VR single pass instance compability:
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 #if defined(LOD_FADE_CROSSFADE)
@@ -56,23 +57,23 @@ Varyings vert(Attributes input)
 
     float shellStep = _TotalShellStep / _TOTAL_LAYER;
 
-    half moveFactor = pow(abs(_CURRENT_LAYER / _TOTAL_LAYER), _BaseMove.w);
+    float layer = _CURRENT_LAYER / _TOTAL_LAYER;
+
+    half moveFactor = pow(abs(layer), _BaseMove.w);
     half3 windAngle = _Time.w * _WindFreq.xyz;
     half3 windMove = moveFactor * _WindMove.xyz * sin(windAngle + input.positionOS.xyz * _WindMove.w);
     half3 move = moveFactor * _BaseMove.xyz;
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Fur Direction
-    float layer = _CURRENT_LAYER / _TOTAL_LAYER;
-
     float bent = _BentType * layer + (1 - _BentType);
 
     groomWS = lerp(normalInput.normalWS, groomWS, _GroomingIntensity * bent);
     float3 shellDir = SafeNormalize(groomWS + move + windMove);
 
-    float3 posWS = vertexInput.positionWS + shellDir * (shellStep * _CURRENT_LAYER * furLength * _FurLengthIntensity);
+    float3 positionWS = vertexInput.positionWS + shellDir * (shellStep * _CURRENT_LAYER * furLength * _FurLengthIntensity);
 
-    output.positionCS = GetShadowPositionHClip(vertexInput.positionWS, normalInput.normalWS); //posWS, normalInput.normalWS);
+    output.positionCS = GetShadowPositionHClip(vertexInput.positionWS, normalInput.normalWS); //positionWS, normalInput.normalWS);
     output.uv = input.uv;
     output.layer = layer;
     return output;
@@ -80,8 +81,10 @@ Varyings vert(Attributes input)
 
 half4 frag(Varyings input) : SV_Target
 {
-    half4 furColor = SAMPLE_TEXTURE2D(_FurMap, sampler_FurMap, input.uv / _BaseMap_ST.xy * _FurScale);
-    half alpha = furColor.r * (1.0 - input.layer + input.layer);
+    // Future work: Support Multi-Pass Fur Shadow.
+
+    //half4 furColor = SAMPLE_TEXTURE2D(_FurMap, sampler_FurMap, input.uv / _BaseMap_ST.xy * _FurScale);
+    //half alpha = furColor.r * (1.0 - input.layer + input.layer);
     //if (input.layer > 0.0 && alpha < _AlphaCutout) discard;
 
 #ifdef LOD_FADE_CROSSFADE

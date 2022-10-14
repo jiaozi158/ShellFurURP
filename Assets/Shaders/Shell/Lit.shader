@@ -17,7 +17,6 @@ Properties
 
     [Space(10)][Toggle(_GEOM_INSTANCING)] _GeomInstancing("(Slow) More Shell Amount", Float) = 0.0
     [Space(10)][IntRange] _ShellAmount("Shell Amount", Range(1, 52)) = 13
-    [Header(Shell Amount In Renderer Feature)][Space(10)]
     _TotalShellStep("Total Shell Step", Range(0.0, 0.5)) = 0.026
 
     [Space][Header(Advanced)][Space]

@@ -4,6 +4,7 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SurfaceInput.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/ShaderVariablesFunctions.hlsl"
 #include "./Param-MP.hlsl"
+
 // For VR single pass instance compability:
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 #if defined(LOD_FADE_CROSSFADE)
@@ -29,8 +30,8 @@ struct Varyings
     float4 positionCS : SV_POSITION;
     float2 uv : TEXCOORD0;
     float  layer : TEXCOORD1;
-    half3 normalWS : TEXCOORD2;
-    half3 tangentWS : TEXCOORD3;
+    half3  normalWS : TEXCOORD2;
+    half4  tangentWS : TEXCOORD3; // w is tangentOS.w
     DECLARE_LIGHTMAP_OR_SH(staticLightmapUV, vertexSH, 4); //...
     UNITY_VERTEX_INPUT_INSTANCE_ID
     UNITY_VERTEX_OUTPUT_STEREO
@@ -62,27 +63,27 @@ Varyings vert(Attributes input)
 
     float shellStep = _TotalShellStep / _TOTAL_LAYER;
 
-    half moveFactor = pow(abs(_CURRENT_LAYER / _TOTAL_LAYER), _BaseMove.w);
+    float layer = _CURRENT_LAYER / _TOTAL_LAYER;
+
+    half moveFactor = pow(abs(layer), _BaseMove.w);
     half3 windAngle = _Time.w * _WindFreq.xyz;
     half3 windMove = moveFactor * _WindMove.xyz * sin(windAngle + input.positionOS.xyz * _WindMove.w);
     half3 move = moveFactor * _BaseMove.xyz;
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Fur Direction
-    float layer = _CURRENT_LAYER / _TOTAL_LAYER;
-
     float bent = _BentType * layer + (1 - _BentType);
 
     groomWS = lerp(normalInput.normalWS, groomWS, _GroomingIntensity * bent);
     float3 shellDir = SafeNormalize(groomWS + move + windMove);
 
-    float3 posWS = vertexInput.positionWS + shellDir * (shellStep * _CURRENT_LAYER * furLength * _FurLengthIntensity);
+    float3 positionWS = vertexInput.positionWS + shellDir * (shellStep * _CURRENT_LAYER * furLength * _FurLengthIntensity);
 
-    output.positionCS = TransformWorldToHClip(posWS);
+    output.positionCS = TransformWorldToHClip(positionWS);
     output.uv = TRANSFORM_TEX(input.uv, _BaseMap);
     output.layer = layer;
     output.normalWS = normalInput.normalWS;
-    output.tangentWS = normalInput.tangentWS;
+    output.tangentWS = half4(normalInput.tangentWS, input.tangentOS.w);
 
     OUTPUT_LIGHTMAP_UV(input.staticLightmapUV, unity_LightmapST, output.staticLightmapUV); //...
     OUTPUT_SH(normalInput.normalWS.xyz, output.vertexSH); //...
@@ -91,7 +92,8 @@ Varyings vert(Attributes input)
 
 half4 frag(Varyings input) : SV_Target
 {
-    half4 furColor = SAMPLE_TEXTURE2D(_FurMap, sampler_FurMap, input.uv / _BaseMap_ST.xy * _FurScale);
+    float2 furUV = input.uv / _BaseMap_ST.xy * _FurScale;
+    half4 furColor = SAMPLE_TEXTURE2D(_FurMap, sampler_FurMap, furUV);
     half alpha = furColor.r * (1.0 - input.layer);
 
 #ifdef _ALPHATEST_ON // MSAA Alpha-To-Coverage Mask
@@ -110,14 +112,13 @@ half4 frag(Varyings input) : SV_Target
 #endif
 
     half3 normalTS = UnpackNormalScale(
-        SAMPLE_TEXTURE2D(_NormalMap, sampler_NormalMap, input.uv / _BaseMap_ST.xy * _FurScale),
+        SAMPLE_TEXTURE2D(_NormalMap, sampler_NormalMap, furUV),
         _NormalScale);
 
-    // 1.0 should be tangentOS.w.
-    half3 bitangent = SafeNormalize(1.0 * cross(input.normalWS, input.tangentWS));
+    half3 bitangent = SafeNormalize(input.tangentWS.w * cross(input.normalWS, input.tangentWS.xyz));
     half3 normalWS = SafeNormalize(TransformTangentToWorld(
         normalTS,
-        half3x3(input.tangentWS, bitangent, input.normalWS)));
+        half3x3(input.tangentWS.xyz, bitangent, input.normalWS)));
 
     // Stores World Space Normal to "_CameraNormalsTexture".
     return half4(NormalizeNormalPerPixel(normalWS), 0.0);

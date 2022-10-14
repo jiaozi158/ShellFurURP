@@ -6,6 +6,7 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SurfaceInput.hlsl"
 #include "./Param.hlsl"
 #include "./Common.hlsl"
+
 // For VR single pass instance compability:
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 #if defined(LOD_FADE_CROSSFADE)
@@ -24,17 +25,16 @@ struct Attributes
 struct v2g
 {
     float4 positionOS : POSITION;
-    float3 normalWS : NORMAL;
-    float3 tangentWS : TANGENT;
+    half3  normalWS : NORMAL;
     float2 uv : TEXCOORD0;
-    half3 groomWS : TEXCOORD1;
-    half furLength : TEXCOORD2;
+    half3  groomWS : TEXCOORD1;
+    half   furLength : TEXCOORD2;
     UNITY_VERTEX_INPUT_INSTANCE_ID
 };
 
 struct g2f
 {
-    float4 vertex : SV_POSITION;
+    float4 positionCS : SV_POSITION;
     float2 uv : TEXCOORD0;
     float  layer : TEXCOORD1;
     UNITY_VERTEX_INPUT_INSTANCE_ID
@@ -65,7 +65,6 @@ v2g vert(Attributes input)
 
     output.positionOS = input.positionOS;
     output.normalWS = normalInput.normalWS;
-    output.tangentWS = normalInput.tangentWS;
     output.uv = input.uv;
     return output;
 }
@@ -86,25 +85,24 @@ void AppendShellVertex(inout TriangleStream<g2f> stream, v2g input, int index)
     half clampedShellAmount = clamp(_ShellAmount, 1, 13);
     half shellStep = _TotalShellStep / clampedShellAmount;
 
-    half moveFactor = pow(abs((half)index / clamp(_ShellAmount, 1, 13)), _BaseMove.w);
-    float3 posOS = input.positionOS.xyz;
+    half layer = (half)index / clampedShellAmount;
+
+    half moveFactor = pow(abs(layer), _BaseMove.w);
     half3 windAngle = _Time.w * _WindFreq.xyz;
-    half3 windMove = moveFactor * _WindMove.xyz * sin(windAngle + posOS * _WindMove.w);
+    half3 windMove = moveFactor * _WindMove.xyz * sin(windAngle + input.positionOS.xyz * _WindMove.w);
     half3 move = moveFactor * _BaseMove.xyz;
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Fur Direction
-    half layer = (half)index / clampedShellAmount;
-
     half bent = _BentType * layer + (1 - _BentType);
 
     half3 groomWS = lerp(input.normalWS, input.groomWS, _GroomingIntensity * bent);
     half3 shellDir = SafeNormalize(groomWS + move + windMove);
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    float3 posWS = vertexInput.positionWS + shellDir * (shellStep * index * input.furLength * _FurLengthIntensity);
+    float3 positionWS = vertexInput.positionWS + shellDir * (shellStep * index * input.furLength * _FurLengthIntensity);
     
-    output.vertex = GetShadowPositionHClip(posWS, input.normalWS);
+    output.positionCS = GetShadowPositionHClip(positionWS, input.normalWS);
     output.uv = TRANSFORM_TEX(input.uv, _FurMap);
     output.layer = layer;
 
@@ -126,25 +124,24 @@ void AppendShellVertexInstancing(inout TriangleStream<g2f> stream, v2g input, in
 
     float shellStep = _TotalShellStep / _ShellAmount;
 
-    float moveFactor = pow(abs((float)index / _ShellAmount), _BaseMove.w);
-    float3 posOS = input.positionOS.xyz;
+    float layer = (float)index / _ShellAmount;
+
+    float moveFactor = pow(abs(layer), _BaseMove.w);
     half3 windAngle = _Time.w * _WindFreq.xyz;
-    half3 windMove = moveFactor * _WindMove.xyz * sin(windAngle + posOS * _WindMove.w);
+    half3 windMove = moveFactor * _WindMove.xyz * sin(windAngle + input.positionOS.xyz * _WindMove.w);
     float3 move = moveFactor * _BaseMove.xyz;
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Fur Direction
-    float layer = (float)index / _ShellAmount;
-
     float bent = _BentType * layer + (1 - _BentType);
 
     float3 groomWS = lerp(input.normalWS, input.groomWS, _GroomingIntensity * bent);
     float3 shellDir = SafeNormalize(groomWS + move + windMove);
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    float3 posWS = vertexInput.positionWS + shellDir * (shellStep * index * input.furLength * _FurLengthIntensity);
+    float3 positionWS = vertexInput.positionWS + shellDir * (shellStep * index * input.furLength * _FurLengthIntensity);
 
-    output.vertex = GetShadowPositionHClip(posWS, input.normalWS);
+    output.positionCS = GetShadowPositionHClip(positionWS, input.normalWS);
     output.uv = TRANSFORM_TEX(input.uv, _FurMap);
     output.layer = layer;
 
@@ -218,7 +215,7 @@ half4 frag(g2f input) : SV_Target
     if (input.layer > 0.0 && alpha < _AlphaCutout) discard;
 
 #ifdef LOD_FADE_CROSSFADE
-    LODFadeCrossFade(input.vertex);
+    LODFadeCrossFade(input.positionCS);
 #endif
 
     return 0;

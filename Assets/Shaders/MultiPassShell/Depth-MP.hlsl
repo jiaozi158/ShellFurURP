@@ -3,6 +3,7 @@
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SurfaceInput.hlsl"
 #include "./Param-MP.hlsl"
+
 // VR single pass instance compability:
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 #if defined(LOD_FADE_CROSSFADE)
@@ -59,23 +60,23 @@ Varyings vert(Attributes input)
 
     float shellStep = _TotalShellStep / _TOTAL_LAYER;
 
-    half moveFactor = pow(abs(_CURRENT_LAYER / _TOTAL_LAYER), _BaseMove.w);
+    float layer = _CURRENT_LAYER / _TOTAL_LAYER;
+
+    half moveFactor = pow(abs(layer), _BaseMove.w);
     half3 windAngle = _Time.w * _WindFreq.xyz;
     half3 windMove = moveFactor * _WindMove.xyz * sin(windAngle + input.positionOS.xyz * _WindMove.w);
     half3 move = moveFactor * _BaseMove.xyz;
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Fur Direction
-    float layer = _CURRENT_LAYER / _TOTAL_LAYER;
-
     float bent = _BentType * layer + (1 - _BentType);
 
     groomWS = lerp(normalInput.normalWS, groomWS, _GroomingIntensity * bent);
     float3 shellDir = SafeNormalize(groomWS + move + windMove);
 
-    float3 posWS = vertexInput.positionWS + shellDir * (shellStep * _CURRENT_LAYER * furLength * _FurLengthIntensity);
+    float3 positionWS = vertexInput.positionWS + shellDir * (shellStep * _CURRENT_LAYER * furLength * _FurLengthIntensity);
     
-    output.positionCS = TransformWorldToHClip(posWS);
+    output.positionCS = TransformWorldToHClip(positionWS);
     output.uv = TRANSFORM_TEX(input.uv, _BaseMap);
     output.layer = layer;
 

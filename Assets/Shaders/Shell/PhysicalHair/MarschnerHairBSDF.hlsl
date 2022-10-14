@@ -244,9 +244,11 @@ CBSDF EvaluateBSDF(half3 V, half3 L, BSDFData bsdfData)
     // Fetch the preintegrated azimuthal distributions for each path
     const half3 D = GetRoughenedAzimuthalScatteringDistribution(angles.phi, angles.cosThetaD, bsdfData.perceptualRoughnessRadial);
 
-    /// Approximate
+    // Solve the first three lobes (R, TT, TRT).
+    
     //R
     {
+        // Attenuation for this path as proposed by d'Eon et al, replaced with a trig identity for cos half phi.
         A[0] = F_Schlick(bsdfData.fresnel0, sqrt(0.5 + 0.5 * dot(L,V)));
 
         //D = 0.25 * sqrt(0.5 + 0.5 * angles.cosPhi);
@@ -274,6 +276,7 @@ CBSDF EvaluateBSDF(half3 V, half3 L, BSDFData bsdfData)
 
     //TRT
     {
+        // Attenutation (Simplified for H = ¡Ì3/2)
         half cosGammaO = SafeSqrt(1 - Sq(HAIR_H_TRT));
         half cosTheta  = angles.cosThetaO * cosGammaO;
         F = F_Schlick(bsdfData.fresnel0, cosTheta);
@@ -290,7 +293,9 @@ CBSDF EvaluateBSDF(half3 V, half3 L, BSDFData bsdfData)
         
         S += M[2] * A[2] * D[2];
     }
-    
+    // TODO: Residual TRRT+ Lobe. (accounts for ~15% energy otherwise lost by the first three lobes).
+
+    // This seems necesarry to match the reference.
     S *= INV_PI;
     
     // Transmission event is built into the model.

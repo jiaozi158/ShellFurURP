@@ -4,6 +4,7 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/SurfaceInput.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/ShaderVariablesFunctions.hlsl"
 #include "./Param.hlsl"
+
 // For VR single pass instance compability:
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 #if defined(LOD_FADE_CROSSFADE)
@@ -23,7 +24,7 @@ struct v2g
 {
     float4 positionOS : POSITION;
     half3  normalWS : NORMAL;
-    half4  tangentWS : TANGENT;
+    half4  tangentWS : TANGENT;  // w is tangentOS.w
     float2 uv : TEXCOORD0;
     half3  groomWS : TEXCOORD1;
     half   furLength : TEXCOORD2;
@@ -36,7 +37,7 @@ struct g2f
     float2 uv : TEXCOORD0;
     float  layer : TEXCOORD1;
     half3  normalWS : TEXCOORD2;
-    half4  tangentWS : TEXCOORD3;
+    half4  tangentWS : TEXCOORD3; // w is tangentOS.w
     UNITY_VERTEX_INPUT_INSTANCE_ID
     UNITY_VERTEX_OUTPUT_STEREO
 };
@@ -196,7 +197,8 @@ void geom(triangle v2g input[3], inout TriangleStream<g2f> stream)
 
 half4 frag(g2f input) : SV_Target
 {
-    half4 furColor = SAMPLE_TEXTURE2D(_FurMap, sampler_FurMap, input.uv / _BaseMap_ST.xy * _FurScale);
+    float2 furUV = input.uv / _BaseMap_ST.xy * _FurScale;
+    half4 furColor = SAMPLE_TEXTURE2D(_FurMap, sampler_FurMap, furUV);
     half alpha = furColor.r * (1.0 - input.layer);
 
 #ifdef _ALPHATEST_ON // MSAA Alpha-To-Coverage Mask
@@ -215,7 +217,7 @@ half4 frag(g2f input) : SV_Target
 #endif
 
     half3 normalTS = UnpackNormalScale(
-        SAMPLE_TEXTURE2D(_NormalMap, sampler_NormalMap, input.uv / _BaseMap_ST.xy * _FurScale),
+        SAMPLE_TEXTURE2D(_NormalMap, sampler_NormalMap, furUV),
         _NormalScale);
 
     half3 bitangent = SafeNormalize(input.tangentWS.w * cross(input.normalWS, input.tangentWS.xyz));
