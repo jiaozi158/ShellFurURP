@@ -390,7 +390,6 @@ SubShader
         ColorMask R
 
         HLSLPROGRAM
-        #pragma multi_compile _ _GEOM_INSTANCING
 
 #if (UNITY_VERSION >= 202220)
         #pragma shader_feature_local_fragment _ _ALPHATEST_ON
@@ -414,7 +413,6 @@ SubShader
         ZWrite On
 
         HLSLPROGRAM
-        #pragma multi_compile _ _GEOM_INSTANCING
 
 #if (UNITY_VERSION >= 202220)
         #pragma shader_feature_local_fragment _ _ALPHATEST_ON
