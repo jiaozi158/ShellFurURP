@@ -44,14 +44,9 @@ struct Varyings
 
 Varyings vert(Attributes input)
 {
-    Varyings output = (Varyings)0;
-    // setup the instanced id
+    Varyings output = (Varyings)0; // or use "v2g output" and "ZERO_INITIALIZE(v2g, output)"
+
     UNITY_SETUP_INSTANCE_ID(input);
-    // set all values in the "Varyings output" to 0.0
-    // This is the URP version of UNITY_INITIALIZE_OUTPUT()
-    ZERO_INITIALIZE(Varyings, output);
-    // copy instance id in the "Attributes input" to the "v2g output"
-    UNITY_TRANSFER_INSTANCE_ID(input, output);
     UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
 
     VertexPositionInputs vertexInput = GetVertexPositionInputs(input.positionOS.xyz);
@@ -101,6 +96,8 @@ Varyings vert(Attributes input)
 
 FragmentOutput frag(Varyings input)
 {
+    UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
+
     float2 furUV = input.uv / _BaseMap_ST.xy * _FurScale;
     half4 furColor = SAMPLE_TEXTURE2D(_FurMap, sampler_FurMap, furUV);
     half alpha = furColor.r * (1.0 - input.layer);

@@ -27,6 +27,7 @@ struct v2g
     half3  groomWS : TEXCOORD1;
     half   furLength : TEXCOORD2;
     UNITY_VERTEX_INPUT_INSTANCE_ID
+    UNITY_VERTEX_OUTPUT_STEREO
 };
 
 struct g2f
@@ -40,14 +41,11 @@ struct g2f
 
 v2g vert(Attributes input)
 {
-    v2g output = (v2g)0;
-    // setup the instanced id
+    v2g output = (v2g)0; // or use "v2g output" and "ZERO_INITIALIZE(v2g, output)"
+
     UNITY_SETUP_INSTANCE_ID(input);
-    // set all values in the "v2g output" to 0.0
-    // This is the URP version of UNITY_INITIALIZE_OUTPUT()
-    ZERO_INITIALIZE(v2g, output);
-    // copy instance id in the "Attributes input" to the "v2g output"
     UNITY_TRANSFER_INSTANCE_ID(input, output);
+    UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
 
     VertexNormalInputs normalInput = GetVertexNormalInputs(input.normalOS, input.tangentOS);
 
@@ -68,13 +66,12 @@ v2g vert(Attributes input)
 
 void AppendShellVertex(inout TriangleStream<g2f> stream, v2g input, int index)
 {
-    g2f output = (g2f)0;
-    UNITY_SETUP_INSTANCE_ID(input);
     // set all values in the g2f output to 0.0
-    ZERO_INITIALIZE(g2f, output);
+    g2f output = (g2f)0; // or use "g2f output" and "ZERO_INITIALIZE(g2f, output)"
 
+    UNITY_SETUP_INSTANCE_ID(input);
     UNITY_TRANSFER_INSTANCE_ID(input, output);
-    UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
+    UNITY_TRANSFER_VERTEX_OUTPUT_STEREO(input, output);
 
     VertexPositionInputs vertexInput = GetVertexPositionInputs(input.positionOS.xyz);
 
@@ -109,13 +106,12 @@ void AppendShellVertex(inout TriangleStream<g2f> stream, v2g input, int index)
 // For geometry shader instancing, no clamp on _ShellAmount.
 void AppendShellVertexInstancing(inout TriangleStream<g2f> stream, v2g input, int index)
 {
-    g2f output = (g2f)0;
-    UNITY_SETUP_INSTANCE_ID(input);
     // set all values in the g2f output to 0.0
-    ZERO_INITIALIZE(g2f, output);
+    g2f output = (g2f)0; // or use "g2f output" and "ZERO_INITIALIZE(g2f, output)"
 
+    UNITY_SETUP_INSTANCE_ID(input);
     UNITY_TRANSFER_INSTANCE_ID(input, output);
-    UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
+    UNITY_TRANSFER_VERTEX_OUTPUT_STEREO(input, output);
 
     VertexPositionInputs vertexInput = GetVertexPositionInputs(input.positionOS.xyz);
 
@@ -185,6 +181,13 @@ void geom(triangle v2g input[3], inout TriangleStream<g2f> stream)
 
 float frag(g2f input) : SV_TARGET
 {
+    UNITY_SETUP_INSTANCE_ID(input);
+#if UNITY_ANY_INSTANCING_ENABLED
+    // As we use geometry shaders, we manually set the StereoEyeIndex based on current instanceID.
+    unity_StereoEyeIndex = UNITY_GET_INSTANCE_ID(input);
+    //UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
+#endif
+
     float2 furUV = input.uv / _BaseMap_ST.xy * _FurScale;
     half4 furColor = SAMPLE_TEXTURE2D(_FurMap, sampler_FurMap, furUV);
     half alpha = furColor.r * (1.0 - input.layer);
