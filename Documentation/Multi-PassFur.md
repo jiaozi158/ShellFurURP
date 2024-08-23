@@ -8,13 +8,23 @@ Although most Android devices support geometry shader, Multi-Pass Fur usually ru
 How To Use
 ----------
 
-1. Add **all** Multi-Pass Fur Renderer Features to your current URP asset.
+1. Find and select the active URP renderer in the scene's camera inspector window.
 
-   ![AddMulti-PassFur](https://github.com/jiaozi158/ShellFurURP/blob/main/Documentation/Images/Multi-PassFur/Add_All_Multi-PassFur_RendererFeatures.jpg)
+   ![FindActiveURPRenderer](./Images/Multi-PassFur/Find_Active_URP_Renderer.jpg)
 
-2. Select the material, choose the shader named "Universal Render Pipeline / Fur / Multi-Pass Shell / Lit".
+2. Add the following Multi-Pass Fur Renderer Features to your active URP renderer asset.
 
-3. Adjusting material properties just like the geometry-shader-based fur.
+- Multi-Pass Fur Forward
+
+- Multi-Pass Fur Depth
+
+- Multi-Pass Fur DepthNormals
+
+   ![AddMulti-PassFur](./Images/Multi-PassFur/Add_MultiPass_Renderer_Features.jpg)
+
+3. Select the material, choose the shader named "Universal Render Pipeline / Fur / Multi-Pass Shell / Lit".
+
+4. Adjusting material properties just like the geometry-shader-based fur.
    
    Note: You should now set "Shell Amount" in Fur Renderer Features. **Remember to keep it the same in all Fur Renderer Features.**
    

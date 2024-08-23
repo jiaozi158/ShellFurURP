@@ -242,8 +242,10 @@ void frag(Varyings input
 #ifdef _ADDITIONAL_LIGHTS
 
 #if USE_FORWARD_PLUS // Forward+ rendering path.
-    for (uint lightIndex = 0; lightIndex < min(_AdditionalLightsDirectionalCount, MAX_VISIBLE_LIGHTS); lightIndex++)
+    [loop] for (uint lightIndex = 0; lightIndex < min(_AdditionalLightsDirectionalCount, MAX_VISIBLE_LIGHTS); lightIndex++)
     {
+        FORWARD_PLUS_SUBTRACTIVE_LIGHT_CHECK
+
         Light light = GetAdditionalLight(lightIndex, inputData, shadowMask, aoFactor);
 
 #ifdef _LIGHT_LAYERS

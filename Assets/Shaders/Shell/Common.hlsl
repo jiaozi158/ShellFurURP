@@ -6,6 +6,16 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Shadows.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
+// Quick fix for "https://github.com/jiaozi158/ShellFurURP/issues/3"
+#ifndef _AdditionalLightsDirectionalCount
+#define _AdditionalLightsDirectionalCount URP_FP_DIRECTIONAL_LIGHTS_COUNT
+#endif
+
+// Empty define for compatibility with older versions of URP
+#ifndef FORWARD_PLUS_SUBTRACTIVE_LIGHT_CHECK
+#define FORWARD_PLUS_SUBTRACTIVE_LIGHT_CHECK
+#endif
+
 // Main Light Direction.
 float3 _LightDirection;
 
@@ -66,8 +76,10 @@ void ApplyRimLight(inout float3 color, float3 posWS, float3 viewDirWS, float3 no
     int additionalLightsCount = GetAdditionalLightsCount();
 
 #if USE_FORWARD_PLUS // Forward+ rendering path.
-    for (uint lightIndex = 0; lightIndex < min(_AdditionalLightsDirectionalCount, MAX_VISIBLE_LIGHTS); lightIndex++)
+    [loop] for (uint lightIndex = 0; lightIndex < min(_AdditionalLightsDirectionalCount, MAX_VISIBLE_LIGHTS); lightIndex++)
     {
+        FORWARD_PLUS_SUBTRACTIVE_LIGHT_CHECK
+
         Light light = GetAdditionalLight(lightIndex, posWS);
 #if defined (_LIGHT_LAYERS)
         if (IsMatchingLightLayer(light.layerMask, meshRenderingLayers))
