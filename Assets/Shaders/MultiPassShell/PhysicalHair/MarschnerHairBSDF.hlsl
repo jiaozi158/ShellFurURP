@@ -303,8 +303,8 @@ CBSDF EvaluateBSDF(half3 V, half3 L, BSDFData bsdfData)
     cbsdf.specR = max(S, 0);
 
     // See "Analytic Tangent Irradiance Environment Maps for Anisotropic Surfaces".
-    //cbsdf.diffR = clampedNdotL; // for URP
-    cbsdf.diffR = Lambert() * clampedNdotL; // from HDRP
+    cbsdf.diffR = clampedNdotL; // for URP
+    //cbsdf.diffR = Lambert() * clampedNdotL; // for HDRP
     
     return cbsdf;
 }
