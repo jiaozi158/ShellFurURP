@@ -194,7 +194,11 @@ void frag(Varyings input
     inputData.normalizedScreenSpaceUV = GetNormalizedScreenSpaceUV(input.positionCS);
     inputData.shadowMask = SAMPLE_SHADOWMASK(input.staticLightmapUV);
 
+#if UNITY_VERSION >= 600000
+    SETUP_DEBUG_TEXTURE_DATA(inputData, UNDO_TRANSFORM_TEX(input.uv, _BaseMap));
+#else
     SETUP_DEBUG_TEXTURE_DATA(inputData, input.uv, _BaseMap);
+#endif
 
 #ifdef _DBUFFER
     ApplyDecalToSurfaceData(input.positionCS, surfaceData, inputData);
